@@ -1,21 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Bell,
   Check,
   ChevronDown,
   FolderKanban,
   LayoutDashboard,
+  LogOut,
   Menu,
   Plus,
   Settings,
   Users,
   X,
-  LogOut,
 } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useWorkspaceStore } from "@/lib/workspace-store";
 
 const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -33,71 +34,146 @@ const navItems = [
   { label: "Settings", href: "/settings", icon: Settings },
 ];
 
-// Clean Mock Data Structures
-const mockWorkspaces = [
-  { id: "ws-1", name: "Personal Workspace" },
-  { id: "ws-2", name: "Engineering Team" },
-];
-
-const mockProjects = [
-  { id: "website-redesign", name: "Website Redesign" },
-  { id: "mobile-app", name: "Mobile App v2" },
-];
-
-export function AppShell({
-  children,
-}: {
-  children: ReactNode;
-}): React.JSX.Element {
+export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
 
-  // UI Interactive States
-  const [isMobileOpen, setIsMobileOpen] = useState<boolean>(false);
-  const [workspaceOpen, setWorkspaceOpen] = useState<boolean>(false);
-  const [activeWorkspaceId, setActiveWorkspaceId] = useState<string>("ws-1");
-  const [notificationsOpen, setNotificationsOpen] = useState<boolean>(false);
+  const workspaces = useWorkspaceStore((state) => state.workspaces);
+  const activeWorkspaceId = useWorkspaceStore(
+    (state) => state.activeWorkspaceId,
+  );
+  const setActiveWorkspace = useWorkspaceStore(
+    (state) => state.setActiveWorkspace,
+  );
+  const addWorkspace = useWorkspaceStore((state) => state.addWorkspace);
+  const storeHydrated = useWorkspaceStore((state) => state.hydrated);
+  const projects = useWorkspaceStore((state) => state.projects);
 
   const activeWorkspace =
-    mockWorkspaces.find((ws) => ws.id === activeWorkspaceId) ??
-    mockWorkspaces[0];
+    workspaces.find((workspace) => workspace.id === activeWorkspaceId) ??
+    workspaces[0] ??
+    null;
+
+  const currentWorkspaceId = activeWorkspace?.id ?? null;
+
+  // Only show projects belonging to the currently selected workspace.
+  const workspaceProjects = currentWorkspaceId
+    ? projects.filter(
+        (project) => project.workspaceId === currentWorkspaceId,
+      )
+    : [];
+
+  const hasNoWorkspaces = storeHydrated && workspaces.length === 0;
+
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [workspaceOpen, setWorkspaceOpen] = useState(false);
+  const [isCreateWorkspaceOpen, setIsCreateWorkspaceOpen] = useState(false);
+  const [newWorkspaceName, setNewWorkspaceName] = useState("");
+
+  /* ------------------------------------------------------------------------ */
+  /*                         Explicit Zustand hydration                       */
+  /* ------------------------------------------------------------------------ */
+
+  useEffect(() => {
+    // Because the store uses skipHydration, localStorage will not be read
+    // until this runs on the client.
+    useWorkspaceStore.persist.rehydrate();
+  }, []);
+
+  /* ------------------------------------------------------------------------ */
+  /*                         Empty workspace onboarding                       */
+  /* ------------------------------------------------------------------------ */
+
+  useEffect(() => {
+    if (hasNoWorkspaces) {
+      // Defer to next tick to avoid synchronous setState in effect
+      const timeoutId = setTimeout(() => {
+        setIsCreateWorkspaceOpen(true);
+      }, 0);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [hasNoWorkspaces]);
+
+  useEffect(() => {
+    if (!isCreateWorkspaceOpen) return;
+
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !hasNoWorkspaces) {
+        setIsCreateWorkspaceOpen(false);
+        setNewWorkspaceName("");
+      }
+    };
+
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isCreateWorkspaceOpen, hasNoWorkspaces]);
+
+  const closeCreateWorkspace = () => {
+    // A user with zero workspaces must create one before continuing.
+    if (hasNoWorkspaces) return;
+
+    setIsCreateWorkspaceOpen(false);
+    setNewWorkspaceName("");
+  };
+
+  const handleCreateWorkspace = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const trimmedName = newWorkspaceName.trim();
+    if (!trimmedName) return;
+
+    const workspaceId = addWorkspace(trimmedName);
+
+    // addWorkspace makes the first workspace active. For subsequent
+    // workspaces, explicitly activate the newly created workspace.
+    if (workspaceId) {
+      setActiveWorkspace(workspaceId);
+    }
+
+    setNewWorkspaceName("");
+    setIsCreateWorkspaceOpen(false);
+    setWorkspaceOpen(false);
+  };
 
   return (
-    <div className="min-h-screen text-foreground flex flex-col lg:flex-row">
-      {/* Mobile Drawer Overlay */}
+    <div className="flex min-h-screen flex-col text-foreground lg:flex-row">
       {isMobileOpen && (
         <button
           type="button"
-          className="fixed inset-0 z-40 bg-foreground/20 backdrop-blur-sm lg:hidden w-full h-full text-left"
+          className="fixed inset-0 z-40 h-full w-full bg-foreground/20 text-left backdrop-blur-sm lg:hidden"
           onClick={() => setIsMobileOpen(false)}
-          aria-label="Close menu layout"
+          aria-label="Close menu"
         />
       )}
 
-      {/* Sidebar Core Component */}
       <aside
         className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-border bg-card px-4 py-5 transition-transform duration-200 ease-in-out lg:static lg:w-64 lg:translate-x-0 ${
           isMobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        {/* Top Header Selector Area */}
         <div className="mb-7 flex items-center justify-between px-2">
           <button
             type="button"
-            className="flex items-center gap-3 text-left focus:outline-none"
-            onClick={() => setWorkspaceOpen((prev) => !prev)}
+            className="flex w-full items-center gap-3 text-left focus:outline-none"
+            onClick={() => setWorkspaceOpen((previous) => !previous)}
+            aria-expanded={workspaceOpen}
+            aria-haspopup="true"
           >
             <span className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground">
               <Check className="size-5" />
             </span>
-            <div>
-              <span className="block text-sm font-semibold truncate max-w-[130px]">
-                {activeWorkspace?.name}
+
+            <div className="min-w-0 flex-1">
+              <span className="block max-w-[130px] truncate text-sm font-semibold">
+                {activeWorkspace?.name || "Select Workspace"}
               </span>
               <span className="block text-xs text-muted-foreground">
-                {mockWorkspaces.length} workspaces
+                {workspaces.length}{" "}
+                {workspaces.length === 1 ? "workspace" : "workspaces"}
               </span>
             </div>
-            <ChevronDown className="size-4 text-muted-foreground flex-shrink-0" />
+
+            <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
           </button>
 
           <Button
@@ -105,46 +181,61 @@ export function AppShell({
             size="icon"
             className="lg:hidden"
             onClick={() => setIsMobileOpen(false)}
+            aria-label="Close sidebar"
           >
             <X className="size-5" />
           </Button>
         </div>
 
-        {/* Localized Workspaces Multi-Menu Dropdown Panel */}
         {workspaceOpen && (
-          <div className="mb-4 rounded-xl border border-border bg-background p-2 shadow-sm space-y-0.5">
-            <p className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-              Workspaces
-            </p>
-            {mockWorkspaces.map((workspace) => (
+          <div className="mb-4 space-y-1 rounded-xl border border-border bg-background p-2 shadow-sm">
+            <div className="flex items-center justify-between px-2 py-1">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                Workspaces
+              </p>
+
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1 rounded-md px-2 text-xs"
+                onClick={() => setIsCreateWorkspaceOpen(true)}
+              >
+                <Plus className="size-3.5" />
+                New
+              </Button>
+            </div>
+
+            {workspaces.map((workspace) => (
               <button
                 key={workspace.id}
                 type="button"
                 className={`flex w-full items-center justify-between rounded-lg px-2 py-2 text-left text-sm ${
-                  workspace.id === activeWorkspaceId
-                    ? "bg-primary/10 text-primary font-medium"
-                    : "hover:bg-muted text-muted-foreground hover:text-foreground"
+                  workspace.id === currentWorkspaceId
+                    ? "bg-primary/10 font-medium text-primary"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 }`}
                 onClick={() => {
-                  setActiveWorkspaceId(workspace.id);
+                  setActiveWorkspace(workspace.id);
                   setWorkspaceOpen(false);
                 }}
               >
-                <span>{workspace.name}</span>
-                {workspace.id === activeWorkspaceId && (
-                  <Check className="size-4" />
+                <span className="truncate">{workspace.name}</span>
+
+                {workspace.id === currentWorkspaceId && (
+                  <Check className="ml-2 size-4 shrink-0" />
                 )}
               </button>
             ))}
           </div>
         )}
 
-        {/* Primary Navigation Stack */}
         <nav className="flex flex-col gap-1">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isSelected =
               pathname === item.href || pathname.startsWith(`${item.href}/`);
+
             return (
               <Link
                 key={item.href}
@@ -156,14 +247,15 @@ export function AppShell({
                     : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 }`}
               >
-                <Icon className="size-4 flex-shrink-0" />
+                <Icon className="size-4 shrink-0" />
                 <span>{item.label}</span>
+
                 {item.label === "Projects" && (
                   <Badge
                     variant="secondary"
                     className="ml-auto rounded-md px-1.5 text-[10px]"
                   >
-                    {mockProjects.length}
+                    {workspaceProjects.length}
                   </Badge>
                 )}
               </Link>
@@ -171,48 +263,65 @@ export function AppShell({
           })}
         </nav>
 
-        {/* Projects Fast Paths Header */}
         <div className="mt-8 flex items-center justify-between px-3">
           <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Projects
           </p>
+
           <Button
             variant="ghost"
             size="icon"
             className="size-6 text-muted-foreground"
+            aria-label="New project"
           >
-            <Plus className="size-4" />
+            <Link href="/projects">
+              <Plus className="size-4" />
+            </Link>
           </Button>
         </div>
 
-        {/* Project Links Loop */}
-        <div className="mt-2 flex flex-col gap-0.5">
-          {mockProjects.map((project) => (
-            <Link
-              key={project.id}
-              href={`/projects/${project.id}`}
-              onClick={() => setIsMobileOpen(false)}
-              className="truncate rounded-lg px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
-            >
-              {project.name}
-            </Link>
-          ))}
+        <div className="mt-2 flex flex-col gap-0.5 overflow-y-auto">
+          {workspaceProjects.length === 0 ? (
+            <div className="px-3 py-2 text-xs text-muted-foreground">
+              No projects yet.
+            </div>
+          ) : (
+            workspaceProjects.map((project) => {
+              const isActive = pathname === `/projects/${project.id}`;
+
+              return (
+                <Link
+                  key={project.id}
+                  href={`/projects/${project.id}`}
+                  onClick={() => setIsMobileOpen(false)}
+                  aria-current={isActive ? "page" : undefined}
+                  className={`truncate rounded-lg px-3 py-1.5 text-sm ${
+                    isActive
+                      ? "bg-muted font-medium text-foreground"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  }`}
+                >
+                  {project.name}
+                </Link>
+              );
+            })
+          )}
         </div>
 
-        {/* Footer Identity Block & Trigger */}
-        <div className="mt-auto pt-4 border-t border-border/60">
+        <div className="mt-auto border-t border-border/60 pt-4">
           <DropdownMenu>
             <DropdownMenuTrigger
               render={
                 <button
                   type="button"
-                  className="flex w-full items-center gap-3 rounded-xl border border-border p-2.5 hover:bg-muted/50 transition text-left focus:outline-none"
+                  className="flex w-full items-center gap-3 rounded-xl border border-border p-2.5 text-left transition hover:bg-muted/50 focus:outline-none"
                 >
                   <Avatar className="size-9 border border-border">
-                    <AvatarFallback className="text-xs font-bold bg-primary/5 text-primary">
+                    <AvatarFallback className="bg-primary/5 text-xs font-bold text-primary">
                       JD
                     </AvatarFallback>
                   </Avatar>
+
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold tracking-tight">
                       Jordan Doe
@@ -223,15 +332,23 @@ export function AppShell({
                   </div>
                 </button>
               }
-            ></DropdownMenuTrigger>
+            />
 
             <DropdownMenuContent
               align="end"
-              className="w-52 rounded-xl shadow-md p-1"
+              className="w-52 rounded-xl p-1 shadow-md"
               side="top"
               sideOffset={8}
             >
-              <DropdownMenuItem className="text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer rounded-lg gap-2 text-sm font-medium">
+              <DropdownMenuItem
+                onClick={() => router.push("/settings")}
+                className="cursor-pointer gap-2 rounded-lg text-sm"
+              >
+                <Settings className="size-4" />
+                <span>Settings</span>
+              </DropdownMenuItem>
+
+              <DropdownMenuItem className="cursor-pointer gap-2 rounded-lg text-sm font-medium text-destructive focus:bg-destructive/10 focus:text-destructive">
                 <LogOut className="size-4" />
                 <span>Log out</span>
               </DropdownMenuItem>
@@ -240,9 +357,76 @@ export function AppShell({
         </div>
       </aside>
 
-      {/* Main Viewport Content Block */}
-      <div className="flex-1 flex flex-col min-w-0">
-        <header className="flex h-16 items-center justify-between border-b border-border px-4 lg:px-8 bg-background/90 backdrop-blur sticky top-0 z-30">
+      {isCreateWorkspaceOpen && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-foreground/30 p-4 backdrop-blur-sm"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              closeCreateWorkspace();
+            }
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="create-workspace-title"
+            className="w-full max-w-md rounded-2xl border border-border bg-background p-5 shadow-xl"
+          >
+            <div className="mb-4 flex items-center justify-between">
+              <h3
+                id="create-workspace-title"
+                className="text-lg font-semibold"
+              >
+                Create workspace
+              </h3>
+
+              <button
+                type="button"
+                aria-label="Close create workspace dialog"
+                onClick={closeCreateWorkspace}
+                disabled={hasNoWorkspaces}
+                className="rounded-md p-1 text-muted-foreground hover:bg-muted disabled:pointer-events-none disabled:opacity-40"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateWorkspace} className="space-y-3">
+              <label className="block text-sm font-medium text-foreground">
+                Workspace name
+
+                <input
+                  type="text"
+                  autoFocus
+                  value={newWorkspaceName}
+                  onChange={(event) => setNewWorkspaceName(event.target.value)}
+                  placeholder="Marketing team"
+                  className="mt-1.5 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus:border-primary"
+                />
+              </label>
+
+              <div className="flex justify-end gap-2 pt-2">
+                {!hasNoWorkspaces && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={closeCreateWorkspace}
+                  >
+                    Cancel
+                  </Button>
+                )}
+
+                <Button type="submit" disabled={!newWorkspaceName.trim()}>
+                  Create workspace
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-background/90 px-4 backdrop-blur lg:px-8">
           <Button
             variant="ghost"
             size="icon"
@@ -253,25 +437,33 @@ export function AppShell({
             <Menu className="size-5" />
           </Button>
 
-          <div className="flex items-center gap-3 ml-auto relative">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="rounded-full text-muted-foreground"
-              onClick={() => setNotificationsOpen((prev) => !prev)}
-            >
-              <Bell className="size-5" />
-            </Button>
-
-            {notificationsOpen && (
-              <div className="absolute right-0 top-12 z-50 w-64 rounded-xl border border-border bg-popover p-4 text-xs text-muted-foreground shadow-md animate-in fade-in duration-100">
-                No new notifications.
-              </div>
-            )}
+          <div className="ml-auto flex items-center gap-3">
+            <DropdownMenu>
+                <DropdownMenuTrigger className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                  <Avatar className="size-8">
+                    <AvatarFallback>JD</AvatarFallback>
+                  </Avatar>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem>
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start text-sm text-muted-foreground"
+                      onClick={() => {
+                        // logout();
+                        router.push("/login");
+                      }}
+                    >
+                      <LogOut data-icon="inline-start" className="size-4" />
+                      Sign out
+                    </Button>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
           </div>
         </header>
 
-        <main className="flex-1 p-4 md:p-6 lg:p-8 overflow-y-auto max-w-7xl w-full mx-auto">
+        <main className="mx-auto w-full max-w-7xl flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
           {children}
         </main>
       </div>
