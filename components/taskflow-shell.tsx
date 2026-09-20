@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { signOut } from "next-auth/react";
 import {
   Check,
   ChevronDown,
@@ -349,7 +350,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
               <DropdownMenuItem className="cursor-pointer gap-2 rounded-lg text-sm font-medium text-destructive focus:bg-destructive/10 focus:text-destructive">
                 <LogOut className="size-4" />
-                <span>Log out</span>
+                <span onClick={() => signOut({ callbackUrl: "/login" })} style={{ cursor: "pointer" }}>Log out</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -445,18 +446,15 @@ export function AppShell({ children }: { children: ReactNode }) {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem>
-                    <Button
-                      variant="ghost"
-                      className="w-full justify-start text-sm text-muted-foreground"
-                      onClick={() => {
-                        // logout();
-                        router.push("/login");
-                      }}
-                    >
-                      <LogOut data-icon="inline-start" className="size-4" />
-                      Sign out
-                    </Button>
-                  </DropdownMenuItem>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start text-sm text-muted-foreground"
+                    onClick={() => signOut({ callbackUrl: "/login" })}
+                  >
+                    <LogOut data-icon="inline-start" className="size-4" />
+                    Sign out
+                  </Button>
+                </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
           </div>
