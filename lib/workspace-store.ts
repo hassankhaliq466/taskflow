@@ -32,7 +32,14 @@ export interface Project {
   color: string;
   progress: number;
   due: string;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      dueDate?: string;
   members: number;
+}
+
+export interface ProjectMember {
+  projectId: string;
+  memberId: string;
+  role: string;
 }
 
 export interface Task {
@@ -60,6 +67,7 @@ interface WorkspaceState {
   activeWorkspaceId: string | null;
   hydrated: boolean;
   addWorkspace: (name: string) => string;
+  deleteWorkspace: (id: string) => void;
   updateWorkspace: (id: string, patch: Partial<Workspace>) => void;
   setActiveWorkspace: (id: string) => void;
   setHydrated: () => void;
@@ -67,6 +75,7 @@ interface WorkspaceState {
 
 interface TeamSlice {
   members: Member[];
+  deleteMember: (id: string) => void;
   addMember: (input: {
     workspaceId: string;
     name: string;
@@ -77,8 +86,14 @@ interface TeamSlice {
 
 interface ProjectSlice {
   projects: Project[];
+  projectMembers: ProjectMember[];
   tasks: Task[];
   addProject: (input: NewProjectInput) => string;
+  updateProject: (id: string, patch: Partial<Omit<Project, "id">>) => void;
+  deleteProject: (id: string) => void;
+  addProjectMember: (projectId: string, memberId: string, role: string) => void;
+  updateProjectMember: (projectId: string, memberId: string, role: string) => void;
+  removeProjectMember: (projectId: string, memberId: string) => void;
   addTask: (input: NewTaskInput) => void;
   updateTask: (id: string, patch: TaskPatch) => void;
   deleteTask: (id: string) => void;
@@ -116,6 +131,34 @@ const createWorkspaceSlice: StateCreator<
     return id;
   },
 
+  deleteWorkspace: (id) =>
+    set((state) => {
+      const removedProjectIds = new Set(
+        state.projects
+          .filter((project) => project.workspaceId === id)
+          .map((project) => project.id),
+      );
+      const workspaces = state.workspaces.filter(
+        (workspace) => workspace.id !== id,
+      );
+      const activeWorkspaceExists = workspaces.some(
+        (workspace) => workspace.id === state.activeWorkspaceId,
+      );
+
+      return {
+        workspaces,
+        activeWorkspaceId: activeWorkspaceExists
+          ? state.activeWorkspaceId
+          : workspaces[0]?.id ?? null,
+        members: state.members.filter((member) => member.workspaceId !== id),
+        projects: state.projects.filter((project) => project.workspaceId !== id),
+        projectMembers: state.projectMembers.filter(
+          (projectMember) => !removedProjectIds.has(projectMember.projectId),
+        ),
+        tasks: state.tasks.filter((task) => !removedProjectIds.has(task.projectId)),
+      };
+    }),
+
   updateWorkspace: (id, patch) =>
     set((state) => ({
       workspaces: state.workspaces.map((workspace) =>
@@ -143,6 +186,17 @@ const createTeamSlice: StateCreator<
   TeamSlice
 > = (set, get) => ({
   members: [],
+
+  deleteMember: (id) =>
+    set((state) => ({
+      members: state.members.filter((member) => member.id !== id),
+      projectMembers: state.projectMembers.filter(
+        (projectMember) => projectMember.memberId !== id,
+      ),
+      tasks: state.tasks.map((task) =>
+        task.assigneeId === id ? { ...task, assigneeId: null } : task,
+      ),
+    })),
 
   addMember: (input) => {
     const email = input.email.trim().toLowerCase();
@@ -190,6 +244,7 @@ const createProjectSlice: StateCreator<
   ProjectSlice
 > = (set, get) => ({
   projects: [],
+  projectMembers: [],
   tasks: [],
 
   addProject: (input) => {
@@ -209,6 +264,76 @@ const createProjectSlice: StateCreator<
 
     return id;
   },
+
+  updateProject: (id, patch) =>
+    set((state) => ({
+      projects: state.projects.map((project) => {
+        if (project.id !== id) return project;
+
+        return {
+          ...project,
+          ...patch,
+          progress:
+            patch.status === "Completed"
+              ? 100
+              : patch.status && project.status === "Completed"
+                ? 0
+                : project.progress,
+        };
+      }),
+    })),
+
+  deleteProject: (id) =>
+    set((state) => ({
+      projects: state.projects.filter((project) => project.id !== id),
+      projectMembers: state.projectMembers.filter(
+        (projectMember) => projectMember.projectId !== id,
+      ),
+      tasks: state.tasks.filter((task) => task.projectId !== id),
+    })),
+
+  addProjectMember: (projectId, memberId, role) =>
+    set((state) => {
+      const project = state.projects.find((item) => item.id === projectId);
+      const member = state.members.find((item) => item.id === memberId);
+      const alreadyAssigned = state.projectMembers.some(
+        (item) => item.projectId === projectId && item.memberId === memberId,
+      );
+
+      if (
+        !project ||
+        !member ||
+        project.workspaceId !== member.workspaceId ||
+        alreadyAssigned
+      ) {
+        return {};
+      }
+
+      return {
+        projectMembers: [...state.projectMembers, { projectId, memberId, role }],
+      };
+    }),
+
+  updateProjectMember: (projectId, memberId, role) =>
+    set((state) => ({
+      projectMembers: state.projectMembers.map((item) =>
+        item.projectId === projectId && item.memberId === memberId
+          ? { ...item, role }
+          : item,
+      ),
+    })),
+
+  removeProjectMember: (projectId, memberId) =>
+    set((state) => ({
+      projectMembers: state.projectMembers.filter(
+        (item) => item.projectId !== projectId || item.memberId !== memberId,
+      ),
+      tasks: state.tasks.map((task) =>
+        task.projectId === projectId && task.assigneeId === memberId
+          ? { ...task, assigneeId: null }
+          : task,
+      ),
+    })),
 
   addTask: (input) => {
     const project = get().projects.find((p) => p.id === input.projectId);
@@ -265,8 +390,19 @@ export const useWorkspaceStore = create<BoundStoreState>()(
         activeWorkspaceId: state.activeWorkspaceId,
         members: state.members,
         projects: state.projects,
+        projectMembers: state.projectMembers,
         tasks: state.tasks,
       }),
+
+      version: 1,
+      migrate: (persistedState, version) => {
+        const persisted = persistedState as Partial<BoundStoreState>;
+        return {
+          ...persisted,
+          projectMembers:
+            version < 1 ? [] : (persisted.projectMembers ?? []),
+        } as BoundStoreState;
+      },
 
       onRehydrateStorage: () => (state) => {
         if (!state) return;

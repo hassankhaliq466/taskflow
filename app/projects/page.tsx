@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
-import { CalendarDays, Plus, Users, X } from "lucide-react";
+import { CalendarDays, Plus, X } from "lucide-react";
 import { AppShell } from "@/components/taskflow-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -292,6 +292,7 @@ export default function ProjectsPage() {
       status: values.status,
       color: values.color,
       due: formatDue(values.dueDate, values.status),
+      dueDate: values.dueDate,
       members: Math.max(1, Math.floor(Number(values.members)) || 1),
       workspaceId: activeWorkspaceId,
     });
@@ -376,11 +377,6 @@ export default function ProjectsPage() {
                     <Progress value={project.progress} />
                   </div>
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1.5">
-                      <Users className="size-3.5" />
-                      {project.members}{" "}
-                      {project.members === 1 ? "member" : "members"}
-                    </span>
                     <span>{dueLabel(project.due)}</span>
                   </div>
                 </CardContent>

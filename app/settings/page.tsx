@@ -1,5 +1,6 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { X } from "lucide-react";
 import { AppShell } from "@/components/taskflow-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,7 +10,12 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 
 export default function SettingsPage() {
-  const { workspaces, activeWorkspaceId, updateWorkspace } = useWorkspaceStore();
+  const {
+    workspaces,
+    activeWorkspaceId,
+    updateWorkspace,
+    deleteWorkspace,
+  } = useWorkspaceStore();
   const active =
     workspaces.find((workspace) => workspace.id === activeWorkspaceId) ??
     workspaces[0] ??
@@ -19,6 +25,7 @@ export default function SettingsPage() {
   const [workspaceName, setWorkspaceName] = useState(active?.name ?? "");
   const [emailUpdates, setEmailUpdates] = useState(true);
   const [mentions, setMentions] = useState(true);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const router = useRouter();
 
@@ -39,6 +46,35 @@ export default function SettingsPage() {
     router.push(`/dashboard`);
   };
 
+  useEffect(() => {
+    if (!deleteDialogOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setDeleteDialogOpen(false);
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [deleteDialogOpen]);
+
+  const handleRequestDeleteWorkspace = () => {
+    if (!active) {
+      toast.error("Select a workspace before deleting.");
+      return;
+    }
+
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteWorkspace = () => {
+    if (!active) return;
+
+    deleteWorkspace(active.id);
+    setDeleteDialogOpen(false);
+    toast.success(`Workspace "${active.name}" deleted`);
+    router.push("/dashboard");
+  };
+
   return (
     <AppShell>
       <div className="flex max-w-3xl flex-col gap-7">
@@ -49,21 +85,6 @@ export default function SettingsPage() {
             Manage your profile, workspace, and notifications.
           </p>
         </div>
-        <Card>
-          <CardHeader>
-            <CardTitle>Profile information</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-4 sm:grid-cols-2">
-            <label className="flex flex-col gap-2 text-sm font-medium">
-              Full name
-              <Input value={name} onChange={(e) => setName(e.target.value)} />
-            </label>
-            <label className="flex flex-col gap-2 text-sm font-medium">
-              Email
-              <Input value="jordan@acme.co" readOnly />
-            </label>
-          </CardContent>
-        </Card>
         <Card>
           <CardHeader>
             <CardTitle>Workspace</CardTitle>
@@ -113,10 +134,77 @@ export default function SettingsPage() {
             </label>
           </CardContent>
         </Card>
-        <Button className="self-start" onClick={handleSave}>
-          Save changes
-        </Button>
+        <div className="flex justify-start gap-4">
+          <Button className="self-start" onClick={handleSave}>
+            Save changes
+          </Button>
+          <Button
+            className="self-start bg-red-500 text-white hover:bg-red-600"
+            variant="destructive"
+            onClick={handleRequestDeleteWorkspace}
+          >
+            Delete workspace
+          </Button>
+        </div>
       </div>
+      {deleteDialogOpen && active && (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-foreground/30 p-4 backdrop-blur-sm"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setDeleteDialogOpen(false);
+            }
+          }}
+        >
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="delete-workspace-title"
+            aria-describedby="delete-workspace-description"
+            className="w-full max-w-md rounded-xl border border-border bg-background p-6 shadow-xl"
+          >
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <h2 id="delete-workspace-title" className="text-lg font-semibold">
+                Delete workspace?
+              </h2>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Close confirmation"
+                onClick={() => setDeleteDialogOpen(false)}
+              >
+                <X />
+              </Button>
+            </div>
+            <p
+              id="delete-workspace-description"
+              className="text-sm text-muted-foreground"
+            >
+              <span className="font-medium text-foreground">{active.name}</span>{" "}
+              and its projects, tasks, and team members will be permanently
+              deleted. This action cannot be undone.
+            </p>
+            <div className="mt-6 flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                autoFocus
+                onClick={() => setDeleteDialogOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={handleDeleteWorkspace}
+              >
+                Delete workspace
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </AppShell>
   );
 }

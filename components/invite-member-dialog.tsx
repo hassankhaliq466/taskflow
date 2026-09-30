@@ -5,7 +5,7 @@ import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useWorkspaceStore } from "@/lib/workspace-store";
 
-const roleOptions = [
+export const roleOptions = [
   "Developer",
   "Designer",
   "Product Manager",

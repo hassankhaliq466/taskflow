@@ -1,24 +1,59 @@
 "use client";
 
 import { memo, useCallback, useMemo, useState } from "react";
-import { Mail, Plus } from "lucide-react";
+import { Mail, MoreVertical, Plus, Trash2 } from "lucide-react";
 import { AppShell } from "@/components/taskflow-shell";
 import { InviteMemberDialog } from "@/components/invite-member-dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useWorkspaceStore, type Member } from "@/lib/workspace-store";
 
-// Memoized: re-renders only when this member or their task count changes
+// Memoized: re-renders only when this member, their task count, or onDelete changes
 const MemberCard = memo(function MemberCard({
   member,
   taskCount,
+  onDelete,
 }: {
   member: Member;
   taskCount: number;
+  onDelete: (id: string) => void;
 }) {
   return (
-    <Card className="h-full">
+    <Card className="relative h-full">
+      {/* Three Dots Menu */}
+      <div className="absolute right-3 top-3 z-10">
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-8 text-muted-foreground hover:text-foreground"
+              >
+                <MoreVertical className="size-4" />
+                <span className="sr-only">Open menu</span>
+              </Button>
+            }
+          />
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              onClick={() => onDelete(member.id)}
+              className="cursor-pointer text-destructive focus:bg-destructive/10 focus:text-destructive"
+            >
+              <Trash2 className="mr-2 size-4" />
+              <span>Delete</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
       <CardContent className="flex h-full flex-col items-center p-6 text-center">
         <Avatar className="size-16">
           <AvatarFallback className="bg-primary/10 text-primary">
@@ -68,23 +103,31 @@ export default function TeamPage() {
   const members = useWorkspaceStore((s) => s.members);
   const tasks = useWorkspaceStore((s) => s.tasks);
   const projects = useWorkspaceStore((s) => s.projects);
+  const deleteMember = useWorkspaceStore((s) => s.deleteMember);
+
+  const handleDeleteMember = useCallback(
+    (memberId: string) => {
+      deleteMember(memberId);
+    },
+    [deleteMember]
+  );
 
   const workspaceMembers = useMemo(
     () =>
       members.filter((member) => member.workspaceId === activeWorkspaceId),
-    [members, activeWorkspaceId],
+    [members, activeWorkspaceId]
   );
 
   const workspaceProjects = useMemo(
     () =>
       projects.filter((project) => project.workspaceId === activeWorkspaceId),
-    [projects, activeWorkspaceId],
+    [projects, activeWorkspaceId]
   );
 
   // Only count tasks for projects in the active workspace
   const projectIds = useMemo(
     () => new Set(workspaceProjects.map((project) => project.id)),
-    [workspaceProjects],
+    [workspaceProjects]
   );
 
   // Live counts from the project store, so they can't drift out of sync
@@ -125,6 +168,7 @@ export default function TeamPage() {
                   <MemberCard
                     member={member}
                     taskCount={taskCounts[member.id] ?? 0}
+                    onDelete={handleDeleteMember}
                   />
                 </li>
               ))}

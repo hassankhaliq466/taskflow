@@ -10,6 +10,8 @@ import {
 import {
   ArrowLeft,
   Bug,
+  CalendarDays,
+  Mail,
   MoreHorizontal,
   Pencil,
   Plus,
@@ -22,6 +24,7 @@ import {
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { AppShell } from "@/components/taskflow-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -33,12 +36,14 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   useWorkspaceStore,
+  type Project,
   type Priority,
   type Status,
   type Task,
   type TaskType,
   type Member,
 } from "@/lib/workspace-store";
+import { roleOptions } from "@/components/invite-member-dialog";
 
 /* -------------------------------------------------------------------------- */
 /*                                   Types                                    */
@@ -76,6 +81,32 @@ const priorityOptions: { value: Priority; label: string }[] = [
   { value: "high", label: "High" },
 ];
 
+type ProjectStatus = "Planning" | "Active" | "On Hold" | "Completed";
+
+interface ProjectSettingsValues {
+  name: string;
+  description: string;
+  status: ProjectStatus;
+  color: string;
+  dueDate: string;
+}
+
+const projectStatusOptions: ProjectStatus[] = [
+  "Planning",
+  "Active",
+  "On Hold",
+  "Completed",
+];
+
+const projectColorOptions = [
+  { name: "Blue", className: "bg-blue-500" },
+  { name: "Amber", className: "bg-amber-500" },
+  { name: "Emerald", className: "bg-emerald-500" },
+  { name: "Violet", className: "bg-violet-500" },
+  { name: "Rose", className: "bg-rose-500" },
+  { name: "Slate", className: "bg-slate-500" },
+];
+
 const typeStyles: Record<TaskType, { icon: ReactNode; className: string }> = {
   task: {
     icon: <Square className="size-3.5" />,
@@ -97,7 +128,7 @@ const priorityStyles: Record<Priority, string> = {
   high: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300",
 };
 
-const tabs = ["Tasks", "Settings"];
+const tabs = ["Tasks", "Members", "Settings"];
 
 const getLabel = (
   options: { value: string; label: string }[],
@@ -112,6 +143,47 @@ const formatDueDate = (value: string | null) => {
   return new Date(y, m - 1, d).toLocaleDateString("en-GB", options);
 };
 
+const getProjectDueDate = (project: Project) => {
+  if (project.dueDate) return project.dueDate;
+  const legacyDate = project.due.replace(/^Due\s+/, "");
+  if (legacyDate === "Completed" || legacyDate === "No due date") return "";
+
+  const hasYear = /\b\d{4}\b/.test(legacyDate);
+  const date = new Date(
+    hasYear ? legacyDate : `${legacyDate} ${new Date().getFullYear()}`,
+  );
+  if (Number.isNaN(date.getTime())) return "";
+
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+};
+
+const formatProjectDue = (dueDate: string, status: ProjectStatus) => {
+  if (status === "Completed") return "Completed";
+  if (!dueDate) return "No due date";
+  const [year, month, day] = dueDate.split("-").map(Number);
+  const options: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
+  if (year !== new Date().getFullYear()) options.year = "numeric";
+  return `Due ${new Date(year, month - 1, day).toLocaleDateString("en-US", options)}`;
+};
+
+const getProjectSettings = (project: Project): ProjectSettingsValues => ({
+  name: project.name,
+  description: project.description,
+  status: projectStatusOptions.includes(project.status as ProjectStatus)
+    ? (project.status as ProjectStatus)
+    : "Planning",
+  color: project.color,
+  dueDate: getProjectDueDate(project),
+});
+
+const emptyProjectSettings: ProjectSettingsValues = {
+  name: "",
+  description: "",
+  status: "Planning",
+  color: projectColorOptions[0].className,
+  dueDate: "",
+};
+
 const fieldClass =
   "h-10 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 [&>option]:bg-white [&>option]:text-black";
 
@@ -122,13 +194,13 @@ const filterSelectClass =
 /*                               Small components                             */
 /* -------------------------------------------------------------------------- */
 
-function Avatar({ name }: { name: string }) {
+function Avatar({ name, initials }: { name: string; initials?: string }) {
   return (
     <span
       aria-hidden
       className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-medium text-primary-foreground"
     >
-      {name.charAt(0).toUpperCase()}
+      {initials || name.charAt(0).toUpperCase()}
     </span>
   );
 }
@@ -139,7 +211,7 @@ function Field({
   children,
 }: {
   label: string;
-  htmlFor: string;
+  htmlFor?: string;
   children: ReactNode;
 }) {
   return (
@@ -385,19 +457,46 @@ export default function ProjectDetailPage() {
 
   // Shared store: select data and actions individually
   const hydrated = useWorkspaceStore((s) => s.hydrated);
-  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
   const project = useWorkspaceStore((s) =>
     s.projects.find((p) => p.id === id && p.workspaceId === s.activeWorkspaceId)
   );
   const allTasks = useWorkspaceStore((s) => s.tasks);
-  const members = useWorkspaceStore((s) => s.members);
+  const allMembers = useWorkspaceStore((s) => s.members);
+  const projectMemberRecords = useWorkspaceStore((s) => s.projectMembers);
   const addTask = useWorkspaceStore((s) => s.addTask);
   const updateTask = useWorkspaceStore((s) => s.updateTask);
   const deleteTask = useWorkspaceStore((s) => s.deleteTask);
+  const updateProject = useWorkspaceStore((s) => s.updateProject);
+  const deleteProject = useWorkspaceStore((s) => s.deleteProject);
+  const addProjectMember = useWorkspaceStore((s) => s.addProjectMember);
+  const updateProjectMember = useWorkspaceStore((s) => s.updateProjectMember);
+  const removeProjectMember = useWorkspaceStore((s) => s.removeProjectMember);
 
   const workspaceMembers = useMemo(
-    () => members.filter((m) => m.workspaceId === activeWorkspaceId),
-    [members, activeWorkspaceId],
+    () => allMembers.filter((member) => member.workspaceId === project?.workspaceId),
+    [allMembers, project?.workspaceId],
+  );
+
+  const projectMemberRows = useMemo(() => {
+    const memberById = new Map(workspaceMembers.map((member) => [member.id, member]));
+    return projectMemberRecords
+      .filter((entry) => entry.projectId === id)
+      .flatMap((entry) => {
+        const member = memberById.get(entry.memberId);
+        return member ? [{ ...entry, member }] : [];
+      });
+  }, [projectMemberRecords, workspaceMembers, id]);
+
+  const availableMembers = useMemo(() => {
+    const projectMemberIds = new Set(
+      projectMemberRows.map((entry) => entry.memberId),
+    );
+    return workspaceMembers.filter((member) => !projectMemberIds.has(member.id));
+  }, [projectMemberRows, workspaceMembers]);
+
+  const projectAssignees = useMemo(
+    () => projectMemberRows.map((entry) => entry.member),
+    [projectMemberRows],
   );
 
   const [tab, setTab] = useState<string>("Tasks");
@@ -408,6 +507,17 @@ export default function ProjectDetailPage() {
   const [typeFilter, setTypeFilter] = useState<"all" | TaskType>("all");
   const [priorityFilter, setPriorityFilter] = useState<"all" | Priority>("all");
   const [assigneeFilter, setAssigneeFilter] = useState<string>("all"); // "all" | "unassigned" | member id
+  const [settingsDraft, setSettingsDraft] = useState<{
+    projectId: string;
+    values: Partial<ProjectSettingsValues>;
+  }>({ projectId: "", values: {} });
+  const [selectedMemberId, setSelectedMemberId] = useState("");
+  const settings = project
+    ? {
+        ...getProjectSettings(project),
+        ...(settingsDraft.projectId === project.id ? settingsDraft.values : {}),
+      }
+    : emptyProjectSettings;
 
   // Filter in useMemo, not inside the selector (a selector that returns a
   // new array every call can cause an infinite render loop)
@@ -444,7 +554,50 @@ export default function ProjectDetailPage() {
   ).length;
 
   const memberName = (memberId: string | null) =>
-    workspaceMembers.find((m) => m.id === memberId)?.name ?? null;
+    projectAssignees.find((member) => member.id === memberId)?.name ?? null;
+
+  const updateSettings = <K extends keyof ProjectSettingsValues>(
+    key: K,
+    value: ProjectSettingsValues[K],
+  ) =>
+    setSettingsDraft((previous) => ({
+      projectId: project.id,
+      values: {
+        ...(previous.projectId === project.id ? previous.values : {}),
+        [key]: value,
+      },
+    }));
+
+  const handleSaveSettings = () => {
+    if (!settings.name.trim()) {
+      toast.error("Enter a name for the project.");
+      return;
+    }
+
+    updateProject(project.id, {
+      name: settings.name.trim(),
+      description: settings.description.trim(),
+      status: settings.status,
+      color: settings.color,
+      dueDate: settings.dueDate,
+      due: formatProjectDue(settings.dueDate, settings.status),
+    });
+    setSettingsDraft({ projectId: project.id, values: {} });
+    toast.success("Project changes saved");
+  };
+
+  const handleDeleteProject = () => {
+    if (!window.confirm(`Delete "${project.name}" and all of its tasks?`)) return;
+    deleteProject(project.id);
+    toast.success("Project deleted");
+    router.push("/projects");
+  };
+
+  const handleAddProjectMember = () => {
+    if (!selectedMemberId) return;
+    addProjectMember(project.id, selectedMemberId, "Team Member");
+    setSelectedMemberId("");
+  };
 
   const handleCreateTask = (values: TaskFormValues) => {
     addTask({
@@ -539,7 +692,7 @@ export default function ProjectDetailPage() {
           />
           <StatCard
             label="Team Members"
-            value={workspaceMembers.length}
+            value={projectMemberRows.length}
             iconClass="text-blue-600 dark:text-blue-400"
           />
         </div>
@@ -563,9 +716,209 @@ export default function ProjectDetailPage() {
           ))}
         </div>
 
-        {tab !== "Tasks" && (
-          <div className="rounded-xl border border-dashed border-border py-16 text-center text-sm text-muted-foreground">
-            {tab} isn&apos;t built yet.
+        {tab === "Settings" && (
+          <div className="flex max-w-3xl flex-col gap-5">
+            <Card>
+              <CardContent className="grid gap-5 p-6 sm:grid-cols-2">
+                <Field label="Project Name" htmlFor="settings-project-name">
+                  <input
+                    id="settings-project-name"
+                    value={settings.name}
+                    onChange={(event) => updateSettings("name", event.target.value)}
+                    className={fieldClass}
+                  />
+                </Field>
+                <Field label="Status" htmlFor="settings-project-status">
+                  <select
+                    id="settings-project-status"
+                    value={settings.status}
+                    onChange={(event) =>
+                      updateSettings("status", event.target.value as ProjectStatus)
+                    }
+                    className={fieldClass}
+                  >
+                    {projectStatusOptions.map((status) => (
+                      <option key={status} value={status}>
+                        {status}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <div className="sm:col-span-2">
+                  <Field label="Description" htmlFor="settings-project-description">
+                    <textarea
+                      id="settings-project-description"
+                      rows={3}
+                      value={settings.description}
+                      onChange={(event) =>
+                        updateSettings("description", event.target.value)
+                      }
+                      className={`${fieldClass} h-auto resize-y py-2`}
+                    />
+                  </Field>
+                </div>
+                <Field label="Color">
+                  <div
+                    role="radiogroup"
+                    aria-label="Project color"
+                    className="flex flex-wrap gap-3 py-1"
+                  >
+                    {projectColorOptions.map((color) => {
+                      const selected = settings.color === color.className;
+                      return (
+                        <button
+                          key={color.className}
+                          type="button"
+                          role="radio"
+                          aria-checked={selected}
+                          aria-label={color.name}
+                          onClick={() => updateSettings("color", color.className)}
+                          className={`size-8 rounded-full transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background ${color.className} ${
+                            selected
+                              ? "ring-2 ring-foreground ring-offset-2 ring-offset-background"
+                              : "opacity-80 hover:opacity-100"
+                          }`}
+                        />
+                      );
+                    })}
+                  </div>
+                </Field>
+                <Field label="Due Date" htmlFor="settings-project-due-date">
+                  <div className="flex items-center gap-2">
+                    <CalendarDays className="size-5 shrink-0 text-muted-foreground" />
+                    <input
+                      id="settings-project-due-date"
+                      type="date"
+                      value={settings.dueDate}
+                      onChange={(event) => updateSettings("dueDate", event.target.value)}
+                      className={fieldClass}
+                    />
+                  </div>
+                </Field>
+                <div className="flex justify-end sm:col-span-2">
+                  <Button type="button" onClick={handleSaveSettings}>
+                    Save Changes
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-destructive/40">
+              <CardContent className="flex flex-wrap items-center justify-between gap-4 p-6">
+                <div>
+                  <h2 className="font-semibold">Danger Zone</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Deleting this project also permanently deletes its tasks.
+                  </p>
+                </div>
+                <Button variant="destructive" onClick={handleDeleteProject}>
+                  <Trash2 data-icon="inline-start" />
+                  Delete Project
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {tab === "Members" && (
+          <div className="flex flex-col gap-5">
+            <Card>
+              <CardContent className="flex flex-col gap-5 p-6">
+                <div className="flex flex-wrap items-end justify-between gap-4">
+                  <div>
+                    <h2 className="font-semibold">Project Members</h2>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Manage the people assigned to this project.
+                    </p>
+                  </div>
+                  {availableMembers.length > 0 && (
+                    <div className="flex w-full flex-wrap items-end gap-2 sm:w-auto">
+                      <label className="flex min-w-52 flex-1 flex-col gap-2 text-sm font-medium sm:flex-none">
+                        Add Member
+                        <select
+                          aria-label="Select a workspace member to add"
+                          value={selectedMemberId}
+                          onChange={(event) => setSelectedMemberId(event.target.value)}
+                          className={fieldClass}
+                        >
+                          <option value="">Select a member</option>
+                          {availableMembers.map((member) => (
+                            <option key={member.id} value={member.id}>
+                              {member.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <Button
+                        type="button"
+                        onClick={handleAddProjectMember}
+                        disabled={!selectedMemberId}
+                      >
+                        <Plus data-icon="inline-start" />
+                        Add Member
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                {availableMembers.length === 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    No one else is available to add. Invite members from the{" "}
+                    <Link href="/team" className="font-medium text-primary hover:underline">
+                      Team page
+                    </Link>
+                    .
+                  </p>
+                )}
+
+                {projectMemberRows.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-border py-10 text-center text-sm text-muted-foreground">
+                    No members have been added to this project yet.
+                  </div>
+                ) : (
+                  <ul className="divide-y divide-border rounded-lg border border-border">
+                    {projectMemberRows.map(({ member, role }) => (
+                      <li key={member.id} className="flex flex-wrap items-center gap-3 p-4">
+                        <Avatar name={member.name} initials={member.initials} />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium">{member.name}</p>
+                          <a
+                            href={`mailto:${member.email}`}
+                            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground hover:underline"
+                          >
+                            <Mail className="size-3.5 shrink-0" />
+                            <span className="truncate">{member.email}</span>
+                          </a>
+                        </div>
+                        <select
+                          aria-label={`Role for ${member.name}`}
+                          value={role}
+                          onChange={(event) =>
+                            updateProjectMember(project.id, member.id, event.target.value)
+                          }
+                          className={`${filterSelectClass} w-48 max-w-full`}
+                        >
+                          {roleOptions.map((option) => (
+                            <option key={option} value={option}>
+                              {option}
+                            </option>
+                          ))}
+                        </select>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => removeProjectMember(project.id, member.id)}
+                        >
+                          <Trash2 data-icon="inline-start" />
+                          Remove
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </CardContent>
+            </Card>
           </div>
         )}
 
@@ -629,9 +982,9 @@ export default function ProjectDetailPage() {
               >
                 <option value="all">All Assignees</option>
                 <option value="unassigned">Unassigned</option>
-                {workspaceMembers.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name}
+                {projectAssignees.map((member) => (
+                  <option key={member.id} value={member.id}>
+                    {member.name}
                   </option>
                 ))}
               </select>
