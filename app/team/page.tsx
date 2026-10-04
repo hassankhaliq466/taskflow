@@ -20,39 +20,45 @@ const MemberCard = memo(function MemberCard({
   member,
   taskCount,
   onDelete,
+  canDelete = false,
 }: {
   member: Member;
   taskCount: number;
   onDelete: (id: string) => void;
+  canDelete?: boolean;
 }) {
   return (
     <Card className="relative h-full">
-      {/* Three Dots Menu */}
-      <div className="absolute right-3 top-3 z-10">
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            render={
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-8 text-muted-foreground hover:text-foreground"
-              >
-                <MoreVertical className="size-4" />
-                <span className="sr-only">Open menu</span>
-              </Button>
-            }
-          />
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem
-              onClick={() => onDelete(member.id)}
-              className="cursor-pointer text-destructive focus:bg-destructive/10 focus:text-destructive"
-            >
-              <Trash2 className="mr-2 size-4" />
-              <span>Delete</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+      {canDelete && (
+        <>
+          {/* Three Dots Menu */}
+          <div className="absolute right-3 top-3 z-10">
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-8 text-muted-foreground hover:text-foreground"
+                  >
+                    <MoreVertical className="size-4" />
+                    <span className="sr-only">Open menu</span>
+                  </Button>
+                }
+              />
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={() => onDelete(member.id)}
+                  className="cursor-pointer text-destructive focus:bg-destructive/10 focus:text-destructive"
+                >
+                  <Trash2 className="mr-2 size-4" />
+                  <span>Delete</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </>
+      )}
 
       <CardContent className="flex h-full flex-col items-center p-6 text-center">
         <Avatar className="size-16">
@@ -104,12 +110,14 @@ export default function TeamPage() {
   const tasks = useWorkspaceStore((s) => s.tasks);
   const projects = useWorkspaceStore((s) => s.projects);
   const deleteMember = useWorkspaceStore((s) => s.deleteMember);
+  const currentWorkspaceRole = useWorkspaceStore((s) => s.currentWorkspaceRole);
+  const currentUserId = useWorkspaceStore((s) => s.currentUserId);
 
   const handleDeleteMember = useCallback(
     (memberId: string) => {
-      deleteMember(memberId);
+      if (activeWorkspaceId) deleteMember(memberId, activeWorkspaceId);
     },
-    [deleteMember]
+    [deleteMember, activeWorkspaceId]
   );
 
   const workspaceMembers = useMemo(
@@ -141,6 +149,8 @@ export default function TeamPage() {
     return counts;
   }, [tasks, projectIds]);
 
+  const isWorkspaceAdmin = currentWorkspaceRole === "admin" || currentWorkspaceRole === "owner";
+
   return (
     <AppShell>
       <div className="flex flex-col gap-7">
@@ -152,7 +162,7 @@ export default function TeamPage() {
               Everyone working across your projects.
             </p>
           </div>
-          <InviteMemberButton />
+          {isWorkspaceAdmin && <InviteMemberButton />}
         </div>
 
         {/* Wait for saved members to load so seed data doesn't flash first */}
@@ -169,6 +179,7 @@ export default function TeamPage() {
                     member={member}
                     taskCount={taskCounts[member.id] ?? 0}
                     onDelete={handleDeleteMember}
+                    canDelete={isWorkspaceAdmin && currentUserId !== member.id && member.role !== "owner"}
                   />
                 </li>
               ))}

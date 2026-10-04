@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { signOut } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 import {
   Check,
   ChevronDown,
@@ -37,6 +37,7 @@ const navItems = [
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { data: session } = useSession();
 
   const workspaces = useWorkspaceStore((state) => state.workspaces);
   const activeWorkspaceId = useWorkspaceStore(
@@ -48,11 +49,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   const addWorkspace = useWorkspaceStore((state) => state.addWorkspace);
   const storeHydrated = useWorkspaceStore((state) => state.hydrated);
   const projects = useWorkspaceStore((state) => state.projects);
+  const profile = useWorkspaceStore((state) => state.profile);
 
   const activeWorkspace =
-    workspaces.find((workspace) => workspace.id === activeWorkspaceId) ??
-    workspaces[0] ??
-    null;
+    workspaces.find((workspace) => workspace.id === activeWorkspaceId) ?? null;
 
   const currentWorkspaceId = activeWorkspace?.id ?? null;
 
@@ -64,21 +64,26 @@ export function AppShell({ children }: { children: ReactNode }) {
     : [];
 
   const hasNoWorkspaces = storeHydrated && workspaces.length === 0;
+  const userName =
+    profile?.name.trim() ||
+    session?.user?.name?.trim() ||
+    session?.user?.email?.split("@")[0] ||
+    "Account";
+  const userEmail = profile?.email || session?.user?.email || "";
+  const userInitials = userName
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
 
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
   const [isCreateWorkspaceOpen, setIsCreateWorkspaceOpen] = useState(false);
   const [newWorkspaceName, setNewWorkspaceName] = useState("");
-
-  /* ------------------------------------------------------------------------ */
-  /*                         Explicit Zustand hydration                       */
-  /* ------------------------------------------------------------------------ */
-
-  useEffect(() => {
-    // Because the store uses skipHydration, localStorage will not be read
-    // until this runs on the client.
-    useWorkspaceStore.persist.rehydrate();
-  }, []);
+  const [workspaceCreateError, setWorkspaceCreateError] = useState<string | null>(
+    null,
+  );
 
   /* ------------------------------------------------------------------------ */
   /*                         Empty workspace onboarding                       */
@@ -116,20 +121,26 @@ export function AppShell({ children }: { children: ReactNode }) {
     setNewWorkspaceName("");
   };
 
-  const handleCreateWorkspace = (event: FormEvent<HTMLFormElement>) => {
+  const handleCreateWorkspace = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     const trimmedName = newWorkspaceName.trim();
     if (!trimmedName) return;
 
-    const workspaceId = addWorkspace(trimmedName);
+    const workspaceId = await addWorkspace(trimmedName);
+    if (!workspaceId) {
+      setWorkspaceCreateError(
+        useWorkspaceStore.getState().error ??
+          "Could not create the workspace. Please try again.",
+      );
+      return;
+    }
 
     // addWorkspace makes the first workspace active. For subsequent
     // workspaces, explicitly activate the newly created workspace.
-    if (workspaceId) {
-      setActiveWorkspace(workspaceId);
-    }
+    setActiveWorkspace(workspaceId);
 
+    setWorkspaceCreateError(null);
     setNewWorkspaceName("");
     setIsCreateWorkspaceOpen(false);
     setWorkspaceOpen(false);
@@ -147,7 +158,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-border bg-card px-4 py-5 transition-transform duration-200 ease-in-out lg:static lg:w-64 lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-72 min-h-screen flex-col border-r border-border bg-card px-4 py-5 transition-transform duration-200 ease-in-out lg:static lg:min-h-screen lg:w-64 lg:translate-x-0 ${
           isMobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -280,7 +291,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </Button>
         </div>
 
-        <div className="mt-2 flex flex-col gap-0.5 overflow-y-auto">
+        <div className="mt-2 flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
           {workspaceProjects.length === 0 ? (
             <div className="px-3 py-2 text-xs text-muted-foreground">
               No projects yet.
@@ -318,16 +329,16 @@ export function AppShell({ children }: { children: ReactNode }) {
                 >
                   <Avatar className="size-9 border border-border">
                     <AvatarFallback className="bg-primary/5 text-xs font-bold text-primary">
-                      JD
+                      {userInitials}
                     </AvatarFallback>
                   </Avatar>
 
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold tracking-tight">
-                      Jordan Doe
+                      {userName}
                     </p>
                     <p className="truncate text-xs text-muted-foreground">
-                      jordan@taskflow.ui
+                      {userEmail}
                     </p>
                   </div>
                 </button>
@@ -399,11 +410,20 @@ export function AppShell({ children }: { children: ReactNode }) {
                   type="text"
                   autoFocus
                   value={newWorkspaceName}
-                  onChange={(event) => setNewWorkspaceName(event.target.value)}
+                  onChange={(event) => {
+                    setNewWorkspaceName(event.target.value);
+                    setWorkspaceCreateError(null);
+                  }}
                   placeholder="Marketing team"
                   className="mt-1.5 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus:border-primary"
                 />
               </label>
+
+              {workspaceCreateError && (
+                <p role="alert" className="text-sm text-destructive">
+                  {workspaceCreateError}
+                </p>
+              )}
 
               <div className="flex justify-end gap-2 pt-2">
                 {!hasNoWorkspaces && (
@@ -440,8 +460,10 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div className="ml-auto flex items-center gap-3">
             <DropdownMenu>
                 <DropdownMenuTrigger className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                  <Avatar className="size-8">
-                    <AvatarFallback>JD</AvatarFallback>
+                  <Avatar className="size-9 border border-border">
+                    <AvatarFallback className="bg-primary/5 text-xs font-bold text-primary">
+                      {userInitials}
+                    </AvatarFallback>
                   </Avatar>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">

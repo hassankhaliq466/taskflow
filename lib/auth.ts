@@ -3,13 +3,31 @@ import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { MongoDBAdapter } from "@auth/mongodb-adapter";
 import clientPromise from "@/lib/db";
-import { findUserByEmail } from "@/models/User";
+import { findUserByEmail, findUserById } from "@/models/User";
 import bcrypt from "bcryptjs";
 import { authConfig } from "./auth.config";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig, // Spread the shared configurations
   adapter: MongoDBAdapter(clientPromise),
+  callbacks: {
+    ...authConfig.callbacks,
+    async jwt({ token, user, trigger }) {
+      if (user) {
+        token.id = user.id;
+      }
+
+      if (trigger === "update" && token.id) {
+        const currentUser = await findUserById(String(token.id));
+        if (currentUser) {
+          token.name = currentUser.name ?? null;
+          token.email = currentUser.email;
+        }
+      }
+
+      return token;
+    },
+  },
   providers: [
     CredentialsProvider({
       name: "credentials",
@@ -33,7 +51,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         }
 
         return {
-          id: user._id,
+          id: user._id?.toString(),
           email: user.email,
           name: user.name,
         };

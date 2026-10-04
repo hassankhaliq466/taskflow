@@ -8,12 +8,16 @@ import { Input } from "@/components/ui/input";
 import { useWorkspaceStore } from "@/lib/workspace-store";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 
 export default function SettingsPage() {
+  const { data: session, update: updateSession } = useSession();
+  const profile = useWorkspaceStore((state) => state.profile);
   const {
     workspaces,
     activeWorkspaceId,
     updateWorkspace,
+    updateCurrentUserProfile,
     deleteWorkspace,
   } = useWorkspaceStore();
   const active =
@@ -21,13 +25,58 @@ export default function SettingsPage() {
     workspaces[0] ??
     null;
 
-  const [name, setName] = useState("Jordan Davis");
   const [workspaceName, setWorkspaceName] = useState(active?.name ?? "");
+  const [profileName, setProfileName] = useState("");
+  const [profileEmail, setProfileEmail] = useState("");
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [emailUpdates, setEmailUpdates] = useState(true);
   const [mentions, setMentions] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const router = useRouter();
+
+  useEffect(() => {
+    setProfileName(profile?.name ?? session?.user?.name ?? "");
+    setProfileEmail(profile?.email ?? session?.user?.email ?? "");
+  }, [
+    profile?.email,
+    profile?.name,
+    session?.user?.email,
+    session?.user?.name,
+  ]);
+
+  const handleSaveProfile = async () => {
+    setIsSavingProfile(true);
+
+    try {
+      const response = await fetch("/api/user/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: profileName, email: profileEmail }),
+      });
+      const result = (await response.json()) as {
+        error?: string;
+        user?: { name: string; email: string };
+      };
+
+      if (!response.ok) {
+        toast.error(result.error ?? "Could not update your profile.");
+        return;
+      }
+
+      if (result.user) {
+        setProfileName(result.user.name);
+        setProfileEmail(result.user.email);
+        updateCurrentUserProfile(result.user);
+        await updateSession(result.user);
+      }
+      toast.success("Profile updated");
+    } catch {
+      toast.error("Could not update your profile. Please try again.");
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
 
   const handleSave = () => {
     if (!active) {
@@ -43,7 +92,7 @@ export default function SettingsPage() {
 
     updateWorkspace(active.id, { name: trimmed });
     toast.success("Settings saved");
-    router.push(`/dashboard`);
+    router.refresh();
   };
 
   useEffect(() => {
@@ -72,7 +121,7 @@ export default function SettingsPage() {
     deleteWorkspace(active.id);
     setDeleteDialogOpen(false);
     toast.success(`Workspace "${active.name}" deleted`);
-    router.push("/dashboard");
+    router.push("/");
   };
 
   return (
@@ -85,6 +134,37 @@ export default function SettingsPage() {
             Manage your profile, workspace, and notifications.
           </p>
         </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>Profile</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <label className="flex max-w-md flex-col gap-2 text-sm font-medium">
+              Name
+              <Input
+                autoComplete="name"
+                value={profileName}
+                onChange={(event) => setProfileName(event.target.value)}
+              />
+            </label>
+            <label className="flex max-w-md flex-col gap-2 text-sm font-medium">
+              Email
+              <Input
+                type="email"
+                autoComplete="email"
+                value={profileEmail}
+                onChange={(event) => setProfileEmail(event.target.value)}
+              />
+            </label>
+            <Button
+              className="self-start"
+              onClick={handleSaveProfile}
+              disabled={isSavingProfile}
+            >
+              {isSavingProfile ? "Saving..." : "Save profile"}
+            </Button>
+          </CardContent>
+        </Card>
         <Card>
           <CardHeader>
             <CardTitle>Workspace</CardTitle>

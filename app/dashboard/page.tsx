@@ -9,6 +9,7 @@ import {
   Users,
 } from "lucide-react";
 import { useMemo } from "react";
+import { useSession } from "next-auth/react";
 import { AppShell } from "@/components/taskflow-shell";
 import { useWorkspaceStore } from "@/lib/workspace-store";
 import { Badge } from "@/components/ui/badge";
@@ -17,9 +18,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 
 export default function DashboardPage() {
+  const { data: session } = useSession();
+  const profile = useWorkspaceStore((state) => state.profile);
   const activeWorkspaceId = useWorkspaceStore(
     (state) => state.activeWorkspaceId,
   );
+  const currentUserId = useWorkspaceStore((state) => state.currentUserId);
   const hydrated = useWorkspaceStore((state) => state.hydrated);
   const projects = useWorkspaceStore((state) => state.projects);
   const tasks = useWorkspaceStore((state) => state.tasks);
@@ -79,7 +83,9 @@ export default function DashboardPage() {
     (task) => task.status !== "done",
   );
 
-  const myTasks = workspaceTasks.filter((task) => task.assigneeId !== null);
+  const myTasks = workspaceTasks.filter(
+    (task) => task.assigneeId === currentUserId && currentUserId !== null,
+  );
 
   if (!hydrated) {
     return (
@@ -148,7 +154,11 @@ export default function DashboardPage() {
             </p>
 
             <h1 className="mt-1 text-3xl font-semibold tracking-tight">
-              Welcome back, Jordan
+              Welcome back,{" "}
+              {profile?.name.trim() ||
+                session?.user?.name?.trim() ||
+                session?.user?.email?.split("@")[0] ||
+                "there"}
             </h1>
 
             <p className="mt-1 text-sm text-muted-foreground">

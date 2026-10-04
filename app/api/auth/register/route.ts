@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({
-      id: user._id,
+      id: user._id?.toString(),
       email: user.email,
       name: user.name,
     });

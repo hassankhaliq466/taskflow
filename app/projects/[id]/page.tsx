@@ -261,12 +261,12 @@ const emptyForm: TaskFormValues = {
 };
 
 function TaskDialog({
-  members,
+  projectMembers,
   initialValues,
   onClose,
   onSubmit,
 }: {
-  members: Member[];
+  projectMembers: Member[];
   initialValues?: TaskFormValues; // present = edit mode
   onClose: () => void;
   onSubmit: (values: TaskFormValues) => void;
@@ -399,9 +399,9 @@ function TaskDialog({
                 className={fieldClass}
               >
                 <option value="">Unassigned</option>
-                {members.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name}
+                {projectMembers.map((member) => (
+                  <option key={member.id} value={member.id}>
+                    {member.name}
                   </option>
                 ))}
               </select>
@@ -471,6 +471,9 @@ export default function ProjectDetailPage() {
   const addProjectMember = useWorkspaceStore((s) => s.addProjectMember);
   const updateProjectMember = useWorkspaceStore((s) => s.updateProjectMember);
   const removeProjectMember = useWorkspaceStore((s) => s.removeProjectMember);
+  const currentProjectRole = useWorkspaceStore((s) => s.currentProjectRole);
+  const setCurrentProjectRole = useWorkspaceStore((s) => s.setCurrentProjectRole);
+  const currentUserId = useWorkspaceStore((s) => s.currentUserId);
 
   const workspaceMembers = useMemo(
     () => allMembers.filter((member) => member.workspaceId === project?.workspaceId),
@@ -494,10 +497,20 @@ export default function ProjectDetailPage() {
     return workspaceMembers.filter((member) => !projectMemberIds.has(member.id));
   }, [projectMemberRows, workspaceMembers]);
 
-  const projectAssignees = useMemo(
+  const projectMembers = useMemo(
     () => projectMemberRows.map((entry) => entry.member),
     [projectMemberRows],
   );
+
+  // Set current project role when project changes
+  useEffect(() => {
+    if (id) {
+      setCurrentProjectRole(id);
+    }
+  }, [id, setCurrentProjectRole]);
+
+  const isProjectAdmin = currentProjectRole === "admin";
+  const isProjectMember = currentProjectRole !== null;
 
   const [tab, setTab] = useState<string>("Tasks");
   // null = closed, "create" = new task, Task = editing that task
@@ -554,7 +567,7 @@ export default function ProjectDetailPage() {
   ).length;
 
   const memberName = (memberId: string | null) =>
-    projectAssignees.find((member) => member.id === memberId)?.name ?? null;
+    projectMembers.find((member) => member.id === memberId)?.name ?? null;
 
   const updateSettings = <K extends keyof ProjectSettingsValues>(
     key: K,
@@ -667,10 +680,12 @@ export default function ProjectDetailPage() {
               {project.status}
             </span>
           </div>
-          <Button onClick={() => setDialog("create")}>
-            <Plus className="size-4" />
-            <span>New Task</span>
-          </Button>
+          {isProjectAdmin && (
+            <Button onClick={() => setDialog("create")}>
+              <Plus className="size-4" />
+              <span>New Task</span>
+            </Button>
+          )}
         </div>
 
         {/* Stats */}
@@ -699,21 +714,28 @@ export default function ProjectDetailPage() {
 
         {/* Tabs */}
         <div className="flex w-fit max-w-full gap-1 overflow-x-auto rounded-lg border border-border bg-muted/40 p-1">
-          {tabs.map((name) => (
-            <button
-              key={name}
-              type="button"
-              onClick={() => setTab(name)}
-              aria-pressed={tab === name}
-              className={`rounded-md px-4 py-2 text-sm font-medium transition ${
-                tab === name
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {name}
-            </button>
-          ))}
+          {tabs
+            .filter((name) => {
+              if ((name === "Settings" || name === "Members") && !isProjectAdmin) {
+                return false;
+              }
+              return true;
+            })
+            .map((name) => (
+              <button
+                key={name}
+                type="button"
+                onClick={() => setTab(name)}
+                aria-pressed={tab === name}
+                className={`rounded-md px-4 py-2 text-sm font-medium transition ${
+                  tab === name
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {name}
+              </button>
+            ))}
         </div>
 
         {tab === "Settings" && (
@@ -890,29 +912,37 @@ export default function ProjectDetailPage() {
                             <span className="truncate">{member.email}</span>
                           </a>
                         </div>
-                        <select
-                          aria-label={`Role for ${member.name}`}
-                          value={role}
-                          onChange={(event) =>
-                            updateProjectMember(project.id, member.id, event.target.value)
-                          }
-                          className={`${filterSelectClass} w-48 max-w-full`}
-                        >
-                          {roleOptions.map((option) => (
-                            <option key={option} value={option}>
-                              {option}
-                            </option>
-                          ))}
-                        </select>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => removeProjectMember(project.id, member.id)}
-                        >
-                          <Trash2 data-icon="inline-start" />
-                          Remove
-                        </Button>
+                        {member.role === "owner" ? (
+                          <span className="rounded-md bg-muted px-2.5 py-1.5 text-sm font-medium">
+                            Owner
+                          </span>
+                        ) : isProjectAdmin ? (
+                          <>
+                            <select
+                              aria-label={`Role for ${member.name}`}
+                              value={role}
+                              onChange={(event) =>
+                                updateProjectMember(project.id, member.id, event.target.value)
+                              }
+                              className={`${filterSelectClass} w-48 max-w-full`}
+                            >
+                              {roleOptions.map((option) => (
+                                <option key={option} value={option}>
+                                  {option}
+                                </option>
+                              ))}
+                            </select>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => removeProjectMember(project.id, member.id)}
+                            >
+                              <Trash2 data-icon="inline-start" />
+                              Remove
+                            </Button>
+                          </>
+                        ) : null}
                       </li>
                     ))}
                   </ul>
@@ -982,7 +1012,7 @@ export default function ProjectDetailPage() {
               >
                 <option value="all">All Assignees</option>
                 <option value="unassigned">Unassigned</option>
-                {projectAssignees.map((member) => (
+                {projectMembers.map((member) => (
                   <option key={member.id} value={member.id}>
                     {member.name}
                   </option>
@@ -1048,23 +1078,31 @@ export default function ProjectDetailPage() {
                               </span>
                             </td>
                             <td className="px-4 py-3">
-                              <select
-                                aria-label={`Status for ${task.title}`}
-                                value={task.status}
-                                onChange={(e) =>
-                                  handleStatusChange(
-                                    task.id,
-                                    e.target.value as Status,
-                                  )
-                                }
-                                className="h-8 rounded-md border border-transparent bg-transparent px-2 text-sm outline-none transition hover:border-border focus:border-primary focus:ring-2 focus:ring-primary/20 [&>option]:bg-white [&>option]:text-black"
-                              >
-                                {statusOptions.map((o) => (
-                                  <option key={o.value} value={o.value}>
-                                    {o.label}
-                                  </option>
-                                ))}
-                              </select>
+                              {(() => {
+                                const isAssignee = currentUserId ? task.assigneeId === currentUserId : false;
+                                return (
+                                  <select
+                                    aria-label={`Status for ${task.title}`}
+                                    value={task.status}
+                                    onChange={(e) =>
+                                      handleStatusChange(
+                                        task.id,
+                                        e.target.value as Status,
+                                      )
+                                    }
+                                    disabled={!isProjectAdmin && !isAssignee}
+                                    className={`h-8 rounded-md border border-transparent bg-transparent px-2 text-sm outline-none transition hover:border-border focus:border-primary focus:ring-2 focus:ring-primary/20 [&>option]:bg-white [&>option]:text-black ${
+                                      !isProjectAdmin && !isAssignee ? "opacity-50 cursor-not-allowed" : ""
+                                    }`}
+                                  >
+                                    {statusOptions.map((o) => (
+                                      <option key={o.value} value={o.value}>
+                                        {o.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                );
+                              })()}
                             </td>
                             <td className="px-4 py-3">
                               {assignee ? (
@@ -1087,41 +1125,43 @@ export default function ProjectDetailPage() {
                                 {formatDueDate(task.dueDate)}
                               </span>
                             </td>
-                            <td className="px-4 py-3">
-                              <DropdownMenu>
-                                <DropdownMenuTrigger
-                                  render={
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="size-7 text-muted-foreground hover:text-foreground focus:outline-none"
-                                      aria-label={`Options for ${task.title}`}
+                            {isProjectAdmin && (
+                              <td className="px-4 py-3">
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger
+                                    render={
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="size-7 text-muted-foreground hover:text-foreground focus:outline-none"
+                                        aria-label={`Options for ${task.title}`}
+                                      >
+                                        <MoreHorizontal className="size-4" />
+                                      </Button>
+                                    }
+                                  ></DropdownMenuTrigger>
+                                  <DropdownMenuContent
+                                    align="end"
+                                    className="w-40 rounded-lg p-1"
+                                  >
+                                    <DropdownMenuItem
+                                      onClick={() => setDialog(task)}
+                                      className="cursor-pointer gap-2 rounded-md text-xs font-medium"
                                     >
-                                      <MoreHorizontal className="size-4" />
-                                    </Button>
-                                  }
-                                ></DropdownMenuTrigger>
-                                <DropdownMenuContent
-                                  align="end"
-                                  className="w-40 rounded-lg p-1"
-                                >
-                                  <DropdownMenuItem
-                                    onClick={() => setDialog(task)}
-                                    className="cursor-pointer gap-2 rounded-md text-xs font-medium"
-                                  >
-                                    <Pencil className="size-3.5" />
-                                    <span>Edit Task</span>
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    onClick={() => handleTaskDelete(task.id)}
-                                    className="cursor-pointer gap-2 rounded-md text-xs font-medium text-destructive focus:bg-destructive/10 focus:text-destructive"
-                                  >
-                                    <Trash2 className="size-3.5" />
-                                    <span>Delete Task</span>
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </td>
+                                      <Pencil className="size-3.5" />
+                                      <span>Edit Task</span>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onClick={() => handleTaskDelete(task.id)}
+                                      className="cursor-pointer gap-2 rounded-md text-xs font-medium text-destructive focus:bg-destructive/10 focus:text-destructive"
+                                    >
+                                      <Trash2 className="size-3.5" />
+                                      <span>Delete Task</span>
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </td>
+                            )}
                           </tr>
                         );
                       })}
@@ -1145,7 +1185,7 @@ export default function ProjectDetailPage() {
       {dialog && (
         <TaskDialog
           key={dialog === "create" ? "create" : dialog.id}
-          members={workspaceMembers}
+          projectMembers={projectMembers}
           initialValues={
             dialog === "create"
               ? undefined

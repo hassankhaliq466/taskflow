@@ -1,8 +1,8 @@
-import { Db, Collection } from "mongodb";
+import { Db, Collection, ObjectId } from "mongodb";
 import clientPromise from "@/lib/db";
 
 export interface User {
-  _id?: string;
+  _id?: ObjectId;
   email: string;
   password: string;
   name?: string;
@@ -21,6 +21,28 @@ export async function findUserByEmail(email: string): Promise<User | null> {
   return collection.findOne({ email: email.toLowerCase() });
 }
 
+export async function findUserById(id: string): Promise<User | null> {
+  if (!ObjectId.isValid(id)) return null;
+
+  const collection = await getUserCollection();
+  return collection.findOne({ _id: new ObjectId(id) });
+}
+
+export async function updateUserProfile(
+  id: string,
+  profile: { name: string; email: string },
+): Promise<void> {
+  if (!ObjectId.isValid(id)) {
+    throw new Error("Invalid user ID");
+  }
+
+  const collection = await getUserCollection();
+  await collection.updateOne(
+    { _id: new ObjectId(id) },
+    { $set: { ...profile, updatedAt: new Date() } },
+  );
+}
+
 export async function createUser(userData: Omit<User, "_id" | "createdAt" | "updatedAt">): Promise<User> {
   const collection = await getUserCollection();
   const now = new Date();
@@ -31,5 +53,5 @@ export async function createUser(userData: Omit<User, "_id" | "createdAt" | "upd
     updatedAt: now,
   };
   const result = await collection.insertOne(user);
-  return { ...user, _id: result.insertedId.toString() };
+  return { ...user, _id: result.insertedId };
 }

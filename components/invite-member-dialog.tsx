@@ -66,7 +66,7 @@ export function InviteMemberDialog({ onClose }: { onClose: () => void }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
     const next: Errors = {};
@@ -85,7 +85,7 @@ export function InviteMemberDialog({ onClose }: { onClose: () => void }) {
       return;
     }
 
-    const result = addMember({ workspaceId: activeWorkspaceId, name, email, role });
+    const result = await addMember({ workspaceId: activeWorkspaceId, name, email, role });
     if (!result.ok) {
       setErrors({ email: result.error });
       return;
