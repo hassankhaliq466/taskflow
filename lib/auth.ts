@@ -4,6 +4,7 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import { MongoDBAdapter } from "@auth/mongodb-adapter";
 import clientPromise from "@/lib/db";
 import { findUserByEmail, findUserById } from "@/models/User";
+import type { User } from "@/models/User";
 import bcrypt from "bcryptjs";
 import { authConfig } from "./auth.config";
 
@@ -59,3 +60,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
 });
+
+export async function getSessionUser(): Promise<Pick<User, "_id" | "email" | "name"> | null> {
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) return null;
+
+  const user = await findUserById(userId);
+  if (!user?._id) return null;
+
+  return {
+    _id: user._id,
+    email: user.email,
+    name: user.name,
+  };
+}

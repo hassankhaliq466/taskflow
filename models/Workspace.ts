@@ -1,5 +1,6 @@
 import { Db, Collection, ObjectId } from "mongodb";
 import clientPromise from "@/lib/db";
+import { findWorkspaceMember } from "@/models/WorkspaceMember";
 
 export interface Workspace {
   _id?: ObjectId;
@@ -47,4 +48,13 @@ export async function updateWorkspace(id: string, patch: Partial<Workspace>): Pr
 export async function deleteWorkspace(id: string): Promise<void> {
   const collection = await getWorkspaceCollection();
   await collection.deleteOne({ _id: new ObjectId(id) });
+}
+
+export async function isWorkspaceAdmin(workspaceId: string, userId: string): Promise<boolean> {
+  const member = await findWorkspaceMember(workspaceId, userId);
+  return member?.role === "owner" || member?.role === "admin";
+}
+
+export async function isMember(workspaceId: string, userId: string): Promise<boolean> {
+  return (await findWorkspaceMember(workspaceId, userId)) !== null;
 }

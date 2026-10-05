@@ -26,7 +26,11 @@ interface ILoginFormInput {
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") || "/dashboard";
+  const requestedCallbackUrl = searchParams.get("callbackUrl");
+  const callbackUrl =
+    requestedCallbackUrl?.startsWith("/") && !requestedCallbackUrl.startsWith("//")
+      ? requestedCallbackUrl
+      : "/dashboard";
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -162,7 +166,10 @@ function LoginForm() {
 
             <p className="mt-8 text-center text-sm text-muted-foreground">
               Don&apos;t have an account?{" "}
-              <Link className="font-medium text-primary hover:underline" href="/register">
+              <Link
+                className="font-medium text-primary hover:underline"
+                href={`/register?callbackUrl=${encodeURIComponent(callbackUrl)}`}
+              >
                 Create one
               </Link>
             </p>

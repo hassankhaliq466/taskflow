@@ -16,11 +16,6 @@ export const roleOptions = [
 const fieldClass =
   "h-10 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 [&>option]:bg-white [&>option]:text-black";
 
-interface Errors {
-  name?: string;
-  email?: string;
-}
-
 function Field({
   label,
   htmlFor,
@@ -47,57 +42,61 @@ function Field({
   );
 }
 
-// Mount this only while open ({open && <InviteMemberDialog />}),
-// so the form resets every time it opens
 export function InviteMemberDialog({ onClose }: { onClose: () => void }) {
-  const addMember = useWorkspaceStore((s) => s.addMember);
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
-
-  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState(roleOptions[0]);
-  const [errors, setErrors] = useState<Errors>({});
+  const [role, setRole] = useState<"member" | "admin">("member");
+  const [error, setError] = useState<string | null>(null);
+  const [sentTo, setSentTo] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !isSubmitting) onClose();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [isSubmitting, onClose]);
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const normalizedEmail = email.trim().toLowerCase();
 
-    const next: Errors = {};
-    if (!name.trim()) next.name = "Enter the member's name.";
-    if (!email.trim()) next.email = "Enter an email address.";
-    else if (!/^\S+@\S+\.\S+$/.test(email.trim()))
-      next.email = "Enter a valid email address.";
-
-    if (next.name || next.email) {
-      setErrors(next);
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      setError("Enter a valid email address.");
       return;
     }
-
     if (!activeWorkspaceId) {
-      setErrors({ email: "No active workspace selected." });
+      setError("No active workspace selected.");
       return;
     }
 
-    const result = await addMember({ workspaceId: activeWorkspaceId, name, email, role });
-    if (!result.ok) {
-      setErrors({ email: result.error });
-      return;
+    setError(null);
+    setIsSubmitting(true);
+    try {
+      const response = await fetch(`/api/workspaces/${activeWorkspaceId}/invitations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: normalizedEmail, role }),
+      });
+      const result: { error?: string } = await response.json();
+      if (!response.ok) {
+        setError(result.error ?? "Could not send the invitation.");
+        return;
+      }
+      setSentTo(normalizedEmail);
+    } catch {
+      setError("Could not reach the server. Check your connection and try again.");
+    } finally {
+      setIsSubmitting(false);
     }
-    onClose();
   };
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-4 backdrop-blur-sm"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !isSubmitting) onClose();
       }}
     >
       <div
@@ -113,69 +112,67 @@ export function InviteMemberDialog({ onClose }: { onClose: () => void }) {
           <button
             type="button"
             onClick={onClose}
+            disabled={isSubmitting}
             aria-label="Close"
-            className="rounded-md p-1 text-muted-foreground transition hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            className="rounded-md p-1 text-muted-foreground transition hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50"
           >
             <X className="size-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
-          <Field label="Full Name" htmlFor="member-name" error={errors.name}>
-            <input
-              id="member-name"
-              type="text"
-              autoFocus
-              value={name}
-              onChange={(e) => {
-                setName(e.target.value);
-                if (errors.name) setErrors((p) => ({ ...p, name: undefined }));
-              }}
-              placeholder="Full name"
-              aria-invalid={!!errors.name}
-              aria-describedby={errors.name ? "member-name-error" : undefined}
-              className={fieldClass}
-            />
-          </Field>
-
-          <Field label="Email" htmlFor="member-email" error={errors.email}>
-            <input
-              id="member-email"
-              type="email"
-              value={email}
-              onChange={(e) => {
-                setEmail(e.target.value);
-                if (errors.email) setErrors((p) => ({ ...p, email: undefined }));
-              }}
-              placeholder="name@company.com"
-              aria-invalid={!!errors.email}
-              aria-describedby={errors.email ? "member-email-error" : undefined}
-              className={fieldClass}
-            />
-          </Field>
-
-          <Field label="Role" htmlFor="member-role">
-            <select
-              id="member-role"
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
-              className={fieldClass}
-            >
-              {roleOptions.map((r) => (
-                <option key={r} value={r}>
-                  {r}
-                </option>
-              ))}
-            </select>
-          </Field>
-
-          <div className="mt-2 flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button type="submit">Invite Member</Button>
+        {sentTo ? (
+          <div className="flex flex-col gap-5">
+            <p role="status" className="text-sm text-muted-foreground">
+              Invitation sent to <span className="font-medium text-foreground">{sentTo}</span>.
+              They can join the workspace using the link in the email.
+            </p>
+            <div className="flex justify-end">
+              <Button type="button" onClick={onClose}>Done</Button>
+            </div>
           </div>
-        </form>
+        ) : (
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
+            <Field label="Email" htmlFor="member-email" error={error ?? undefined}>
+              <input
+                id="member-email"
+                type="email"
+                autoFocus
+                value={email}
+                onChange={(event) => {
+                  setEmail(event.target.value);
+                  setError(null);
+                }}
+                placeholder="name@company.com"
+                aria-invalid={!!error}
+                aria-describedby={error ? "member-email-error" : undefined}
+                className={fieldClass}
+                disabled={isSubmitting}
+              />
+            </Field>
+
+            <Field label="Workspace access" htmlFor="member-role">
+              <select
+                id="member-role"
+                value={role}
+                onChange={(event) => setRole(event.target.value as "admin" | "member")}
+                className={fieldClass}
+                disabled={isSubmitting}
+              >
+                <option value="member">Member</option>
+                <option value="admin">Admin</option>
+              </select>
+            </Field>
+
+            <div className="mt-2 flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? "Sending..." : "Send invitation"}
+              </Button>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   );

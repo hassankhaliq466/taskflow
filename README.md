@@ -20,6 +20,18 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Workspace email invitations
+
+Configure these environment variables in `.env.local` and in your deployment environment:
+
+```env
+RESEND_API_KEY=your_resend_api_key
+EMAIL_FROM="TaskFlow <invitations@your-verified-domain.com>"
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+```
+
+Use a sender address verified with Resend and set `NEXT_PUBLIC_APP_URL` to the deployed app's public URL outside local development. Never commit API keys. Invited people must sign in or create an account with the email address the invitation was sent to, then accept the invitation from the emailed link.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

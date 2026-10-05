@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useForm, SubmitHandler } from "react-hook-form";
 import { Button } from "@/components/ui/button";
@@ -25,8 +25,14 @@ interface IRegisterFormInput {
   confirmPassword: string;
 }
 
-export default function RegisterPage() {
+function RegisterForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const requestedCallbackUrl = searchParams.get("callbackUrl");
+  const callbackUrl =
+    requestedCallbackUrl?.startsWith("/") && !requestedCallbackUrl.startsWith("//")
+      ? requestedCallbackUrl
+      : "/dashboard";
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -54,7 +60,9 @@ export default function RegisterPage() {
       return;
     }
 
-    router.push("/login?registered=true");
+    router.push(
+      `/login?registered=true&callbackUrl=${encodeURIComponent(callbackUrl)}`,
+    );
     router.refresh();
   };
 
@@ -205,7 +213,10 @@ export default function RegisterPage() {
 
             <p className="mt-8 text-center text-sm text-muted-foreground">
               Already have an account?{" "}
-              <Link className="font-medium text-primary hover:underline" href="/login">
+              <Link
+                className="font-medium text-primary hover:underline"
+                href={`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`}
+              >
                 Sign in
               </Link>
             </p>
@@ -213,5 +224,13 @@ export default function RegisterPage() {
         </section>
       </div>
     </main>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center">Loading...</div>}>
+      <RegisterForm />
+    </Suspense>
   );
 }
