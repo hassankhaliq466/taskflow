@@ -1,4 +1,4 @@
-import { Resend } from "resend";
+import nodemailer from "nodemailer";
 
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (character) => {
@@ -19,11 +19,25 @@ export async function sendInvitationEmail(opts: {
   workspaceName: string;
   token: string;
 }) {
-  const apiKey = process.env.RESEND_API_KEY;
+  const host = process.env.SMTP_HOST;
+  const portValue = process.env.SMTP_PORT;
+  const port = Number(portValue);
+  const secureValue = process.env.SMTP_SECURE;
+  const user = process.env.SMTP_USER;
+  const password = process.env.SMTP_PASSWORD;
   const sender = process.env.EMAIL_FROM;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL;
-  if (!apiKey || !sender || !appUrl) {
-    throw new Error("Invitation email is not configured");
+  if (!host || !portValue || !sender || !appUrl) {
+    throw new Error("Invitation email SMTP configuration is incomplete");
+  }
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error("SMTP_PORT must be an integer between 1 and 65535");
+  }
+  if ((user && !password) || (!user && password)) {
+    throw new Error("SMTP_USER and SMTP_PASSWORD must be configured together");
+  }
+  if (secureValue && secureValue !== "true" && secureValue !== "false") {
+    throw new Error("SMTP_SECURE must be either true or false");
   }
 
   const baseUrl = new URL(appUrl);
@@ -38,8 +52,13 @@ export async function sendInvitationEmail(opts: {
   const workspaceName = escapeHtml(opts.workspaceName);
   const safeAcceptUrl = escapeHtml(acceptUrl);
 
-  const resend = new Resend(apiKey);
-  const { error } = await resend.emails.send({
+  const transporter = nodemailer.createTransport({
+    host,
+    port,
+    secure: secureValue ? secureValue === "true" : port === 465,
+    ...(user && password ? { auth: { user, pass: password } } : {}),
+  });
+  await transporter.sendMail({
     from: sender,
     to: opts.to,
     subject: `${opts.inviterName} invited you to ${opts.workspaceName}`,
@@ -145,6 +164,4 @@ export async function sendInvitationEmail(opts: {
   </body>
 </html>`,
   });
-
-  if (error) throw new Error(error.message);
 }

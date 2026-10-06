@@ -25,12 +25,16 @@ This project uses [`next/font`](https://nextjs.org/docs/app/building-your-applic
 Configure these environment variables in `.env.local` and in your deployment environment:
 
 ```env
-RESEND_API_KEY=your_resend_api_key
-EMAIL_FROM="TaskFlow <invitations@your-verified-domain.com>"
+SMTP_HOST=smtp.your-provider.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=your_smtp_username
+SMTP_PASSWORD=your_smtp_password
+EMAIL_FROM="TaskFlow <invitations@your-domain.com>"
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
-Use a sender address verified with Resend and set `NEXT_PUBLIC_APP_URL` to the deployed app's public URL outside local development. Never commit API keys. Invited people must sign in or create an account with the email address the invitation was sent to, then accept the invitation from the emailed link.
+Configure SMTP credentials and a sender address supported by your email provider. Use port `587` with `SMTP_SECURE=false` for STARTTLS, or port `465` with `SMTP_SECURE=true` for implicit TLS. `SMTP_USER` and `SMTP_PASSWORD` must either both be set or both be omitted for a relay that does not require authentication. Set `NEXT_PUBLIC_APP_URL` to the deployed app's public URL outside local development. Never commit SMTP credentials. Invited people must sign in or create an account with the email address the invitation was sent to, then accept the invitation from the emailed link.
 
 ## Learn More
 
