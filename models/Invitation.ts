@@ -7,11 +7,11 @@ export type InvitationRole = Exclude<WorkspaceRole, "owner">;
 
 export interface Invitation {
   _id?: ObjectId;
-  workspaceId: ObjectId;   // <-- new
+  workspaceId: ObjectId;
   email: string;
   token: string;
   role: InvitationRole;
-  invitedBy: ObjectId;     // <-- new, useful for the email text
+  invitedBy: ObjectId;
   expiresAt: Date;
   createdAt: Date;
 }
@@ -75,13 +75,6 @@ export async function findInvitationByToken(token: string): Promise<Invitation |
   return invitation;
 }
 
-export async function findInvitationsByEmail(email: string): Promise<Invitation[]> {
-  const collection = await getInvitationCollection();
-  return collection
-    .find({ email: email.toLowerCase(), expiresAt: { $gt: new Date() } })
-    .toArray();
-}
-
 export async function findWorkspaceInvitation(
   workspaceId: ObjectId,
   email: string,
@@ -92,15 +85,6 @@ export async function findWorkspaceInvitation(
     email: email.toLowerCase(),
     expiresAt: { $gt: new Date() },
   });
-}
-
-export async function deleteInvitation(id: string): Promise<void> {
-  if (!ObjectId.isValid(id)) {
-    throw new Error("Invalid invitation ID");
-  }
-
-  const collection = await getInvitationCollection();
-  await collection.deleteOne({ _id: new ObjectId(id) });
 }
 
 export async function deleteInvitationByToken(token: string): Promise<void> {

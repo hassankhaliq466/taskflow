@@ -44,6 +44,7 @@ import {
   type Member,
 } from "@/lib/workspace-store";
 import { roleOptions } from "@/components/invite-member-dialog";
+import { startNavigationLoading } from "@/lib/navigation-loading";
 
 /* -------------------------------------------------------------------------- */
 /*                                   Types                                    */
@@ -510,7 +511,6 @@ export default function ProjectDetailPage() {
   }, [id, setCurrentProjectRole]);
 
   const isProjectAdmin = currentProjectRole === "admin";
-  const isProjectMember = currentProjectRole !== null;
 
   const [tab, setTab] = useState<string>("Tasks");
   // null = closed, "create" = new task, Task = editing that task
@@ -539,13 +539,34 @@ export default function ProjectDetailPage() {
     [allTasks, id],
   );
 
-  // Wait for saved data to load before deciding the project doesn't exist,
-  // otherwise a refresh on a new project's page would redirect away
-  useEffect(() => {
-    if (hydrated && !project) router.replace("/projects");
-  }, [hydrated, project, router]);
+  if (!hydrated) {
+    return (
+      <AppShell>
+        <p role="status" className="p-6 text-sm text-muted-foreground">
+          Loading project...
+        </p>
+      </AppShell>
+    );
+  }
 
-  if (!hydrated || !project) return null;
+  if (!project) {
+    return (
+      <AppShell>
+        <div className="flex flex-col gap-3 p-6">
+          <h1 className="text-xl font-semibold">Project unavailable</h1>
+          <p role="alert" className="text-sm text-muted-foreground">
+            This project may have been deleted or you may no longer have access to it.
+          </p>
+          <Link
+            href="/projects"
+            className="w-fit text-sm font-medium text-primary hover:underline"
+          >
+            Back to projects
+          </Link>
+        </div>
+      </AppShell>
+    );
+  }
 
   const visibleTasks = projectTasks.filter((t) => {
     if (statusFilter !== "all" && t.status !== statusFilter) return false;
@@ -603,6 +624,7 @@ export default function ProjectDetailPage() {
     if (!window.confirm(`Delete "${project.name}" and all of its tasks?`)) return;
     deleteProject(project.id);
     toast.success("Project deleted");
+    startNavigationLoading();
     router.push("/projects");
   };
 

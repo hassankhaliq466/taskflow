@@ -73,13 +73,3 @@ export async function removeWorkspaceMember(workspaceId: string, userId: string)
     userId: new ObjectId(userId),
   });
 }
-
-export async function isWorkspaceOwner(workspaceId: string, userId: string): Promise<boolean> {
-  const member = await findWorkspaceMember(workspaceId, userId);
-  return member?.role === "owner";
-}
-
-export async function isWorkspaceAdmin(workspaceId: string, userId: string): Promise<boolean> {
-  const member = await findWorkspaceMember(workspaceId, userId);
-  return member?.role === "owner" || member?.role === "admin";
-}

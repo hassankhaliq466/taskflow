@@ -9,17 +9,20 @@ import { useWorkspaceStore } from "@/lib/workspace-store";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { startNavigationLoading } from "@/lib/navigation-loading";
 
 export default function SettingsPage() {
   const { data: session, update: updateSession } = useSession();
   const profile = useWorkspaceStore((state) => state.profile);
-  const {
-    workspaces,
-    activeWorkspaceId,
-    updateWorkspace,
-    updateCurrentUserProfile,
-    deleteWorkspace,
-  } = useWorkspaceStore();
+  const workspaces = useWorkspaceStore((state) => state.workspaces);
+  const activeWorkspaceId = useWorkspaceStore(
+    (state) => state.activeWorkspaceId,
+  );
+  const updateWorkspace = useWorkspaceStore((state) => state.updateWorkspace);
+  const updateCurrentUserProfile = useWorkspaceStore(
+    (state) => state.updateCurrentUserProfile,
+  );
+  const deleteWorkspace = useWorkspaceStore((state) => state.deleteWorkspace);
   const active =
     workspaces.find((workspace) => workspace.id === activeWorkspaceId) ??
     workspaces[0] ??
@@ -116,6 +119,7 @@ export default function SettingsPage() {
     deleteWorkspace(active.id);
     setDeleteDialogOpen(false);
     toast.success(`Workspace "${active.name}" deleted`);
+    startNavigationLoading();
     router.push("/");
   };
 

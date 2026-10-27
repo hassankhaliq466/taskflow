@@ -49,11 +49,6 @@ export async function findProjectMembers(projectId: string): Promise<ProjectMemb
   return collection.find({ projectId: new ObjectId(projectId) }).toArray();
 }
 
-export async function findUserProjects(userId: string): Promise<ProjectMember[]> {
-  const collection = await getProjectMemberCollection();
-  return collection.find({ userId: new ObjectId(userId) }).toArray();
-}
-
 export async function updateProjectMemberRole(
   projectId: string,
   userId: string,
@@ -72,9 +67,4 @@ export async function removeProjectMember(projectId: string, userId: string): Pr
     projectId: new ObjectId(projectId),
     userId: new ObjectId(userId),
   });
-}
-
-export async function isProjectAdmin(projectId: string, userId: string): Promise<boolean> {
-  const member = await findProjectMember(projectId, userId);
-  return member?.role === "admin";
 }

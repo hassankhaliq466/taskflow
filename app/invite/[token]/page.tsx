@@ -62,6 +62,7 @@ export default async function InvitationPage({
         {signedInEmail ? (
           <InvitationActions
             token={token}
+            workspaceId={invitation.workspaceId.toString()}
             invitedEmail={invitation.email}
             signedInEmail={signedInEmail}
           />

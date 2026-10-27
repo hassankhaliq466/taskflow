@@ -1,8 +1,9 @@
 import { auth } from "@/lib/auth";
 import { findProjectMembers } from "@/models/ProjectMember";
 import { addProjectMemberAction } from "@/lib/actions/project";
+import { withApiErrorHandling } from "@/lib/api-error";
 
-export async function GET(
+async function getProjectMembers(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -21,7 +22,7 @@ export async function GET(
   return Response.json({ ok: true, data: { members } });
 }
 
-export async function POST(
+async function addProjectMember(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -39,3 +40,12 @@ export async function POST(
 
   return Response.json({ ok: true });
 }
+
+export const GET = withApiErrorHandling(
+  "GET /api/projects/[id]/members",
+  getProjectMembers,
+);
+export const POST = withApiErrorHandling(
+  "POST /api/projects/[id]/members",
+  addProjectMember,
+);

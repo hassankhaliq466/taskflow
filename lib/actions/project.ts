@@ -5,7 +5,6 @@ import { requireWorkspaceRole, requireProjectRole } from "@/lib/permissions";
 import {
   createProject,
   findProjectById,
-  findProjectsByWorkspaceId,
   updateProject,
   deleteProject,
 } from "@/models/Project";
@@ -15,7 +14,6 @@ import {
   findProjectMembers,
   updateProjectMemberRole,
   removeProjectMember,
-  isProjectAdmin,
 } from "@/models/ProjectMember";
 import {
   deleteTasksByProjectId,
@@ -23,7 +21,6 @@ import {
   updateTask,
 } from "@/models/Task";
 import { findWorkspaceMember } from "@/models/WorkspaceMember";
-import { findUserByEmail } from "@/models/User";
 import { revalidatePath } from "next/cache";
 
 async function getUserId(): Promise<string | null> {
@@ -60,26 +57,6 @@ export async function createProjectAction(
 
   revalidatePath(`/workspace/${workspaceId}`);
   return { ok: true, projectId: project._id!.toString() };
-}
-
-export async function listMyProjectsAction(): Promise<{ ok: true; projects: { id: string; name: string; workspaceId: string; role: string }[] } | { ok: false; error: string }> {
-  const userId = await getUserId();
-  if (!userId) return { ok: false, error: "Not authenticated" };
-
-  const memberships = await findProjectMembers(userId);
-  const projects = await Promise.all(
-    memberships.map(async (m) => {
-      const project = await findProjectById(m.projectId.toString());
-      return {
-        id: m.projectId.toString(),
-        name: project?.name ?? "Unknown Project",
-        workspaceId: project?.workspaceId.toString() ?? "",
-        role: m.role,
-      };
-    })
-  );
-
-  return { ok: true, projects };
 }
 
 export async function updateProjectAction(

@@ -4,12 +4,47 @@ import bcrypt from "bcryptjs";
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, password, name } = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: "Invalid request body" },
+        { status: 400 },
+      );
+    }
 
-    if (!email || !password) {
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return NextResponse.json(
+        { error: "Invalid registration details" },
+        { status: 400 },
+      );
+    }
+
+    const { email, password, name } = body as {
+      email?: unknown;
+      password?: unknown;
+      name?: unknown;
+    };
+
+    if (typeof email !== "string" || typeof password !== "string") {
       return NextResponse.json(
         { error: "Email and password are required" },
         { status: 400 }
+      );
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      return NextResponse.json(
+        { error: "Enter a valid email address" },
+        { status: 400 },
+      );
+    }
+    if (name !== undefined && typeof name !== "string") {
+      return NextResponse.json(
+        { error: "Name must be text" },
+        { status: 400 },
       );
     }
 
@@ -20,7 +55,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const existingUser = await findUserByEmail(email);
+    const existingUser = await findUserByEmail(normalizedEmail);
     if (existingUser) {
       return NextResponse.json(
         { error: "User already exists" },
@@ -33,7 +68,10 @@ export async function POST(request: NextRequest) {
     const user = await createUser({
       email,
       password: hashedPassword,
-      name: name || email.split("@")[0],
+      name:
+        typeof name === "string" && name.trim()
+          ? name.trim()
+          : normalizedEmail.split("@")[0],
     });
 
     return NextResponse.json({

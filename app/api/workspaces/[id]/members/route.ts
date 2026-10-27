@@ -3,8 +3,9 @@ import { ObjectId } from "mongodb";
 import clientPromise from "@/lib/db";
 import { inviteWorkspaceMemberAction } from "@/lib/actions/workspace";
 import { findWorkspaceMembers } from "@/models/WorkspaceMember";
+import { withApiErrorHandling } from "@/lib/api-error";
 
-export async function GET(
+async function getWorkspaceMembers(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -46,7 +47,7 @@ export async function GET(
   return Response.json({ ok: true, data: { members } });
 }
 
-export async function POST(
+async function addWorkspaceMember(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -64,3 +65,12 @@ export async function POST(
 
   return Response.json({ ok: true });
 }
+
+export const GET = withApiErrorHandling(
+  "GET /api/workspaces/[id]/members",
+  getWorkspaceMembers,
+);
+export const POST = withApiErrorHandling(
+  "POST /api/workspaces/[id]/members",
+  addWorkspaceMember,
+);

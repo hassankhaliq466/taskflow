@@ -1,4 +1,3 @@
-"use client";
 import * as React from "react";
 import { cn } from "@/lib/utils";
 export function Avatar({ className, ...props }: React.ComponentProps<"div">) {

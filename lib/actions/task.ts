@@ -6,7 +6,6 @@ import { requireProjectRole } from "@/lib/permissions";
 import {
   createTask,
   findTaskById,
-  findTasksByProjectId,
   updateTask,
   deleteTask,
 } from "@/models/Task";

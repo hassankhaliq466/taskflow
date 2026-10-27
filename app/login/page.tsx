@@ -7,6 +7,7 @@ import { useForm, SubmitHandler } from "react-hook-form";
 import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Toaster } from "sonner";
+import { startNavigationLoading } from "@/lib/navigation-loading";
 import {
   ArrowRight,
   Loader2,
@@ -42,17 +43,22 @@ function LoginForm() {
 
   const onSubmit: SubmitHandler<ILoginFormInput> = async (data) => {
     setError(null);
-    const result = await signIn("credentials", {
-      email: data.email,
-      password: data.password,
-      redirect: false,
-    });
+    try {
+      const result = await signIn("credentials", {
+        email: data.email,
+        password: data.password,
+        redirect: false,
+      });
 
-    if (result?.error) {
-      setError(result.error);
-    } else {
-      router.push(callbackUrl);
-      router.refresh();
+      if (!result.ok || result.error) {
+        setError(result?.error ?? "Could not sign in. Please try again.");
+      } else {
+        startNavigationLoading();
+        router.push(callbackUrl);
+        router.refresh();
+      }
+    } catch {
+      setError("Could not reach the server. Check your connection and try again.");
     }
   };
 

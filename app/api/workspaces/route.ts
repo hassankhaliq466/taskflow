@@ -1,8 +1,9 @@
 import { auth } from "@/lib/auth";
 import { listMyWorkspacesAction } from "@/lib/actions/workspace";
 import { createWorkspaceAction } from "@/lib/actions/workspace";
+import { withApiErrorHandling } from "@/lib/api-error";
 
-export async function GET() {
+async function getWorkspaces() {
   const session = await auth();
   if (!session?.user?.id) {
     return Response.json({ ok: false, error: "Not authenticated" }, { status: 401 });
@@ -16,7 +17,7 @@ export async function GET() {
   return Response.json({ ok: true, data: { workspaces: result.workspaces } });
 }
 
-export async function POST(request: Request) {
+async function createWorkspace(request: Request) {
   const session = await auth();
   if (!session?.user?.id) {
     return Response.json({ ok: false, error: "Not authenticated" }, { status: 401 });
@@ -30,3 +31,9 @@ export async function POST(request: Request) {
 
   return Response.json({ ok: true, data: { workspaceId: result.workspaceId } });
 }
+
+export const GET = withApiErrorHandling("GET /api/workspaces", getWorkspaces);
+export const POST = withApiErrorHandling(
+  "POST /api/workspaces",
+  createWorkspace,
+);

@@ -3,9 +3,10 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { useForm, SubmitHandler } from "react-hook-form";
+import { useForm, useWatch, SubmitHandler } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Toaster } from "sonner";
+import { startNavigationLoading } from "@/lib/navigation-loading";
 import {
   ArrowRight,
   Loader2,
@@ -39,31 +40,36 @@ function RegisterForm() {
   const {
     register: registerForm,
     handleSubmit,
-    watch,
+    control,
     formState: { errors, isSubmitting: isLoading },
   } = useForm<IRegisterFormInput>();
 
-  const password = watch("password");
+  const password = useWatch({ control, name: "password" });
 
   const onSubmit: SubmitHandler<IRegisterFormInput> = async (data) => {
     setError(null);
-    const res = await fetch("/api/auth/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
+    try {
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
 
-    const result = await res.json();
+      const result: { error?: string } = await res.json();
 
-    if (!res.ok) {
-      setError(result.error || "Something went wrong");
-      return;
+      if (!res.ok) {
+        setError(result.error || "Something went wrong");
+        return;
+      }
+
+      startNavigationLoading();
+      router.push(
+        `/login?registered=true&callbackUrl=${encodeURIComponent(callbackUrl)}`,
+      );
+      router.refresh();
+    } catch {
+      setError("Could not reach the server. Check your connection and try again.");
     }
-
-    router.push(
-      `/login?registered=true&callbackUrl=${encodeURIComponent(callbackUrl)}`,
-    );
-    router.refresh();
   };
 
   return (

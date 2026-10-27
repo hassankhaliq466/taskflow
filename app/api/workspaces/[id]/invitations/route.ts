@@ -5,8 +5,9 @@ import { sendInvitationEmail } from "@/lib/email";
 import { getSessionUser } from "@/lib/auth";
 import { findWorkspaceById, isWorkspaceAdmin, isMember } from "@/models/Workspace";
 import { findUserByEmail } from "@/models/User";
+import { withApiErrorHandling } from "@/lib/api-error";
 
-export async function POST(
+async function createWorkspaceInvitation(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
@@ -78,3 +79,8 @@ export async function POST(
 
   return NextResponse.json({ ok: true }, { status: 201 });
 }
+
+export const POST = withApiErrorHandling(
+  "POST /api/workspaces/[id]/invitations",
+  createWorkspaceInvitation,
+);

@@ -1,7 +1,8 @@
 import { auth } from "@/lib/auth";
 import { removeWorkspaceMemberAction, changeWorkspaceMemberRoleAction } from "@/lib/actions/workspace";
+import { withApiErrorHandling } from "@/lib/api-error";
 
-export async function DELETE(
+async function deleteWorkspaceMember(
   request: Request,
   { params }: { params: Promise<{ id: string; memberId: string }> }
 ) {
@@ -19,7 +20,7 @@ export async function DELETE(
   return Response.json({ ok: true });
 }
 
-export async function PATCH(
+async function updateWorkspaceMember(
   request: Request,
   { params }: { params: Promise<{ id: string; memberId: string }> }
 ) {
@@ -37,3 +38,12 @@ export async function PATCH(
 
   return Response.json({ ok: true });
 }
+
+export const DELETE = withApiErrorHandling(
+  "DELETE /api/workspaces/[id]/members/[memberId]",
+  deleteWorkspaceMember,
+);
+export const PATCH = withApiErrorHandling(
+  "PATCH /api/workspaces/[id]/members/[memberId]",
+  updateWorkspaceMember,
+);

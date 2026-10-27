@@ -1,8 +1,9 @@
 import { auth } from "@/lib/auth";
 import { findProjectById } from "@/models/Project";
 import { updateProjectAction, deleteProjectAction } from "@/lib/actions/project";
+import { withApiErrorHandling } from "@/lib/api-error";
 
-export async function GET(
+async function getProject(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -20,7 +21,7 @@ export async function GET(
   return Response.json({ ok: true, data: { project } });
 }
 
-export async function PATCH(
+async function updateProjectRoute(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -39,7 +40,7 @@ export async function PATCH(
   return Response.json({ ok: true });
 }
 
-export async function DELETE(
+async function deleteProjectRoute(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -56,3 +57,16 @@ export async function DELETE(
 
   return Response.json({ ok: true });
 }
+
+export const GET = withApiErrorHandling(
+  "GET /api/projects/[id]",
+  getProject,
+);
+export const PATCH = withApiErrorHandling(
+  "PATCH /api/projects/[id]",
+  updateProjectRoute,
+);
+export const DELETE = withApiErrorHandling(
+  "DELETE /api/projects/[id]",
+  deleteProjectRoute,
+);

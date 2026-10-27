@@ -26,6 +26,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useWorkspaceStore } from "@/lib/workspace-store";
+import { startNavigationLoading } from "@/lib/navigation-loading";
 
 const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -352,7 +353,10 @@ export function AppShell({ children }: { children: ReactNode }) {
               sideOffset={8}
             >
               <DropdownMenuItem
-                onClick={() => router.push("/settings")}
+                onClick={() => {
+                  startNavigationLoading();
+                  router.push("/settings");
+                }}
                 className="cursor-pointer gap-2 rounded-lg text-sm"
               >
                 <Settings className="size-4" />

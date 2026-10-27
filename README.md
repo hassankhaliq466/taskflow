@@ -25,16 +25,20 @@ This project uses [`next/font`](https://nextjs.org/docs/app/building-your-applic
 Configure these environment variables in `.env.local` and in your deployment environment:
 
 ```env
+MONGODB_URI=your_mongodb_connection_string
+MONGODB_DB=taskflow
+NEXTAUTH_SECRET=generate_a_long_random_secret
+NEXTAUTH_URL=http://localhost:3000
 SMTP_HOST=smtp.your-provider.com
 SMTP_PORT=587
 SMTP_SECURE=false
 SMTP_USER=your_smtp_username
 SMTP_PASSWORD=your_smtp_password
 EMAIL_FROM="TaskFlow <invitations@your-domain.com>"
-NEXT_PUBLIC_APP_URL=http://localhost:3000
+NEXT_APP_URL=http://localhost:3000
 ```
 
-Configure SMTP credentials and a sender address supported by your email provider. Use port `587` with `SMTP_SECURE=false` for STARTTLS, or port `465` with `SMTP_SECURE=true` for implicit TLS. `SMTP_USER` and `SMTP_PASSWORD` must either both be set or both be omitted for a relay that does not require authentication. Set `NEXT_PUBLIC_APP_URL` to the deployed app's public URL outside local development. Never commit SMTP credentials. Invited people must sign in or create an account with the email address the invitation was sent to, then accept the invitation from the emailed link.
+`MONGODB_URI` and `NEXTAUTH_SECRET` are required. `MONGODB_DB` defaults to `taskflow` if omitted. Set `NEXTAUTH_URL` and `NEXT_APP_URL` to the deployed app's public URL in Vercel; the `localhost` values above are for local development only. SMTP settings are required to send invitations: use port `587` with `SMTP_SECURE=false` for STARTTLS, or port `465` with `SMTP_SECURE=true` for implicit TLS. `SMTP_USER` and `SMTP_PASSWORD` must either both be set or both be omitted for a relay that does not require authentication. Never commit secrets or SMTP credentials. Invited people must sign in or create an account with the email address the invitation was sent to, then accept the invitation from the emailed link.
 
 ## Learn More
 

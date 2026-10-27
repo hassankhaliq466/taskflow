@@ -15,7 +15,7 @@ export async function getWorkspaceCollection(): Promise<Collection<Workspace>> {
   return db.collection<Workspace>("workspaces");
 }
 
-export async function createWorkspace(name: string, userId: string): Promise<Workspace> {
+export async function createWorkspace(name: string): Promise<Workspace> {
   const collection = await getWorkspaceCollection();
   const now = new Date();
   const workspace: Workspace = {
@@ -30,11 +30,6 @@ export async function createWorkspace(name: string, userId: string): Promise<Wor
 export async function findWorkspaceById(id: string): Promise<Workspace | null> {
   const collection = await getWorkspaceCollection();
   return collection.findOne({ _id: new ObjectId(id) });
-}
-
-export async function findWorkspacesByUserId(userId: string): Promise<Workspace[]> {
-  const collection = await getWorkspaceCollection();
-  return collection.find({}).toArray();
 }
 
 export async function updateWorkspace(id: string, patch: Partial<Workspace>): Promise<void> {

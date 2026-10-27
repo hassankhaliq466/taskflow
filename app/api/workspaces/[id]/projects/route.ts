@@ -1,8 +1,9 @@
 import { auth } from "@/lib/auth";
 import { findProjectsByWorkspaceId } from "@/models/Project";
 import { createProjectAction } from "@/lib/actions/project";
+import { withApiErrorHandling } from "@/lib/api-error";
 
-export async function GET(
+async function getWorkspaceProjects(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -16,7 +17,7 @@ export async function GET(
   return Response.json({ ok: true, data: { projects } });
 }
 
-export async function POST(
+async function createWorkspaceProject(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -34,3 +35,12 @@ export async function POST(
 
   return Response.json({ ok: true, data: { projectId: result.projectId } });
 }
+
+export const GET = withApiErrorHandling(
+  "GET /api/workspaces/[id]/projects",
+  getWorkspaceProjects,
+);
+export const POST = withApiErrorHandling(
+  "POST /api/workspaces/[id]/projects",
+  createWorkspaceProject,
+);

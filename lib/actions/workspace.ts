@@ -5,7 +5,6 @@ import { requireWorkspaceRole } from "@/lib/permissions";
 import {
   createWorkspace,
   findWorkspaceById,
-  findWorkspacesByUserId,
   updateWorkspace,
   deleteWorkspace,
 } from "@/models/Workspace";
@@ -17,8 +16,6 @@ import {
   findUserWorkspaces,
   updateWorkspaceMemberRole,
   removeWorkspaceMember,
-  isWorkspaceOwner,
-  isWorkspaceAdmin,
 } from "@/models/WorkspaceMember";
 import {
   findProjectsByWorkspaceId,
@@ -31,7 +28,6 @@ import {
 import {
   deleteTasksByProjectId,
 } from "@/models/Task";
-import { findUserByEmail } from "@/models/User";
 import { revalidatePath } from "next/cache";
 
 async function getUserId(): Promise<string | null> {
@@ -46,7 +42,7 @@ export async function createWorkspaceAction(name: string): Promise<{ ok: true; w
   const trimmed = name.trim();
   if (!trimmed) return { ok: false, error: "Workspace name is required" };
 
-  const workspace = await createWorkspace(trimmed, userId);
+  const workspace = await createWorkspace(trimmed);
   await addWorkspaceMember(workspace._id!.toString(), userId, "owner");
 
   revalidatePath("/dashboard");

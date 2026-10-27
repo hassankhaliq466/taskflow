@@ -1,7 +1,8 @@
 import { auth } from "@/lib/auth";
 import { findUserByEmail, updateUserProfile } from "@/models/User";
+import { withApiErrorHandling } from "@/lib/api-error";
 
-export async function PATCH(request: Request) {
+async function updateProfile(request: Request) {
   const session = await auth();
   const userId = session?.user?.id;
   if (!userId) {
@@ -68,3 +69,8 @@ export async function PATCH(request: Request) {
     );
   }
 }
+
+export const PATCH = withApiErrorHandling(
+  "PATCH /api/user/profile",
+  updateProfile,
+);

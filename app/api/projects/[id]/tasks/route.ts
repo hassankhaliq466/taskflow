@@ -1,8 +1,9 @@
 import { auth } from "@/lib/auth";
 import { findTasksByProjectId } from "@/models/Task";
 import { createTaskAction } from "@/lib/actions/task";
+import { withApiErrorHandling } from "@/lib/api-error";
 
-export async function GET(
+async function getProjectTasks(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -16,7 +17,7 @@ export async function GET(
   return Response.json({ ok: true, data: { tasks } });
 }
 
-export async function POST(
+async function createProjectTask(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -34,3 +35,12 @@ export async function POST(
 
   return Response.json({ ok: true, data: { taskId: result.taskId } });
 }
+
+export const GET = withApiErrorHandling(
+  "GET /api/projects/[id]/tasks",
+  getProjectTasks,
+);
+export const POST = withApiErrorHandling(
+  "POST /api/projects/[id]/tasks",
+  createProjectTask,
+);

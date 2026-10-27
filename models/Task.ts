@@ -60,11 +60,6 @@ export async function findTasksByProjectId(projectId: string): Promise<Task[]> {
   return collection.find(filter).toArray();
 }
 
-export async function findTasksByAssigneeId(assigneeId: string): Promise<Task[]> {
-  const collection = await getTaskCollection();
-  return collection.find({ assigneeId: new ObjectId(assigneeId) }).toArray();
-}
-
 export async function updateTask(
   id: string,
   patch: Partial<Omit<Task, "_id" | "projectId" | "createdAt">>

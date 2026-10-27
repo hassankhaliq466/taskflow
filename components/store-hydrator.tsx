@@ -34,6 +34,7 @@ export function StoreHydrator() {
       email: session.user.email ?? "",
     });
   }, [
+    session?.user,
     session?.user?.email,
     session?.user?.name,
     status,

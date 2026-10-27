@@ -1,7 +1,8 @@
 import { auth } from "@/lib/auth";
 import { updateTaskAction, deleteTaskAction, updateTaskStatusAction } from "@/lib/actions/task";
+import { withApiErrorHandling } from "@/lib/api-error";
 
-export async function PATCH(
+async function updateTaskRoute(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -29,7 +30,7 @@ export async function PATCH(
   return Response.json({ ok: true });
 }
 
-export async function DELETE(
+async function deleteTaskRoute(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -46,3 +47,12 @@ export async function DELETE(
 
   return Response.json({ ok: true });
 }
+
+export const PATCH = withApiErrorHandling(
+  "PATCH /api/tasks/[id]",
+  updateTaskRoute,
+);
+export const DELETE = withApiErrorHandling(
+  "DELETE /api/tasks/[id]",
+  deleteTaskRoute,
+);

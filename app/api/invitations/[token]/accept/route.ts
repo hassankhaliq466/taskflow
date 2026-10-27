@@ -8,8 +8,9 @@ import {
   addWorkspaceMember,
   findWorkspaceMember,
 } from "@/models/WorkspaceMember";
+import { withApiErrorHandling } from "@/lib/api-error";
 
-export async function POST(
+async function acceptInvitation(
   _request: Request,
   { params }: { params: Promise<{ token: string }> },
 ) {
@@ -47,3 +48,8 @@ export async function POST(
 
   return Response.json({ ok: true, workspaceId });
 }
+
+export const POST = withApiErrorHandling(
+  "POST /api/invitations/[token]/accept",
+  acceptInvitation,
+);

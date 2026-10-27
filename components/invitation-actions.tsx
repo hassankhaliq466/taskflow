@@ -2,17 +2,27 @@
 
 import { useState } from "react";
 import { signOut } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { useWorkspaceStore } from "@/lib/workspace-store";
+import { startNavigationLoading } from "@/lib/navigation-loading";
 
 export function InvitationActions({
   token,
+  workspaceId,
   invitedEmail,
   signedInEmail,
 }: {
   token: string;
+  workspaceId: string;
   invitedEmail: string;
   signedInEmail: string;
 }) {
+  const router = useRouter();
+  const fetchWorkspaces = useWorkspaceStore((state) => state.fetchWorkspaces);
+  const setActiveWorkspace = useWorkspaceStore(
+    (state) => state.setActiveWorkspace,
+  );
   const [error, setError] = useState<string | null>(null);
   const [isAccepting, setIsAccepting] = useState(false);
   const emailMatches = signedInEmail.trim().toLowerCase() === invitedEmail.toLowerCase();
@@ -29,7 +39,22 @@ export function InvitationActions({
         setError(result.error ?? "Could not accept this invitation.");
         return;
       }
-      window.location.assign("/dashboard");
+      const workspacesLoaded = await fetchWorkspaces();
+      if (
+        !workspacesLoaded ||
+        !useWorkspaceStore
+          .getState()
+          .workspaces.some((workspace) => workspace.id === workspaceId)
+      ) {
+        setError(
+          "Invitation accepted, but workspace data could not be refreshed. Reload the page to continue.",
+        );
+        return;
+      }
+      setActiveWorkspace(workspaceId);
+      startNavigationLoading();
+      router.push("/dashboard");
+      router.refresh();
     } catch {
       setError("Could not reach the server. Check your connection and try again.");
     } finally {

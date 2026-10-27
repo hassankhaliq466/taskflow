@@ -74,7 +74,7 @@ interface WorkspaceState {
   profile: { name: string; email: string } | null;
   currentWorkspaceRole: "owner" | "admin" | "member" | null;
   currentProjectRole: "admin" | "member" | null;
-  fetchWorkspaces: () => Promise<void>;
+  fetchWorkspaces: () => Promise<boolean>;
   fetchWorkspaceMembers: (workspaceId: string) => Promise<void>;
   fetchProjects: (workspaceId: string) => Promise<void>;
   fetchProjectMembers: (projectId: string) => Promise<void>;
@@ -234,12 +234,14 @@ const createWorkspaceSlice: StateCreator<
             : {}),
         };
       });
+      return true;
     } else {
       set({
         error: res.error || "Failed to load workspaces",
         loading: false,
         workspacesLoaded: true,
       });
+      return false;
     }
   },
 
