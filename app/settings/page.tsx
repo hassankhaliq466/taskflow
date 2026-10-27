@@ -26,24 +26,20 @@ export default function SettingsPage() {
     null;
 
   const [workspaceName, setWorkspaceName] = useState(active?.name ?? "");
-  const [profileName, setProfileName] = useState("");
-  const [profileEmail, setProfileEmail] = useState("");
+  const [profileDraft, setProfileDraft] = useState<{
+    name: string;
+    email: string;
+  } | null>(null);
+  const profileName =
+    profileDraft?.name ?? profile?.name ?? session?.user?.name ?? "";
+  const profileEmail =
+    profileDraft?.email ?? profile?.email ?? session?.user?.email ?? "";
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [emailUpdates, setEmailUpdates] = useState(true);
   const [mentions, setMentions] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const router = useRouter();
-
-  useEffect(() => {
-    setProfileName(profile?.name ?? session?.user?.name ?? "");
-    setProfileEmail(profile?.email ?? session?.user?.email ?? "");
-  }, [
-    profile?.email,
-    profile?.name,
-    session?.user?.email,
-    session?.user?.name,
-  ]);
 
   const handleSaveProfile = async () => {
     setIsSavingProfile(true);
@@ -65,8 +61,7 @@ export default function SettingsPage() {
       }
 
       if (result.user) {
-        setProfileName(result.user.name);
-        setProfileEmail(result.user.email);
+        setProfileDraft(result.user);
         updateCurrentUserProfile(result.user);
         await updateSession(result.user);
       }
@@ -144,7 +139,12 @@ export default function SettingsPage() {
               <Input
                 autoComplete="name"
                 value={profileName}
-                onChange={(event) => setProfileName(event.target.value)}
+                onChange={(event) =>
+                  setProfileDraft({
+                    name: event.target.value,
+                    email: profileEmail,
+                  })
+                }
               />
             </label>
             <label className="flex max-w-md flex-col gap-2 text-sm font-medium">
@@ -153,7 +153,12 @@ export default function SettingsPage() {
                 type="email"
                 autoComplete="email"
                 value={profileEmail}
-                onChange={(event) => setProfileEmail(event.target.value)}
+                onChange={(event) =>
+                  setProfileDraft({
+                    name: profileName,
+                    email: event.target.value,
+                  })
+                }
               />
             </label>
             <Button

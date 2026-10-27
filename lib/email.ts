@@ -26,7 +26,7 @@ export async function sendInvitationEmail(opts: {
   const user = process.env.SMTP_USER;
   const password = process.env.SMTP_PASSWORD;
   const sender = process.env.EMAIL_FROM;
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+  const appUrl = process.env.NEXT_APP_URL;
   if (!host || !portValue || !sender || !appUrl) {
     throw new Error("Invitation email SMTP configuration is incomplete");
   }
@@ -42,7 +42,7 @@ export async function sendInvitationEmail(opts: {
 
   const baseUrl = new URL(appUrl);
   if (baseUrl.protocol !== "http:" && baseUrl.protocol !== "https:") {
-    throw new Error("NEXT_PUBLIC_APP_URL must use HTTP or HTTPS");
+    throw new Error("NEXT_APP_URL must use HTTP or HTTPS");
   }
   const acceptUrl = new URL(
     `/invite/${encodeURIComponent(opts.token)}`,
